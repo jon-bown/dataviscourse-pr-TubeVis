@@ -442,8 +442,8 @@
       }
     },
     "ConventGarden": {
-      "title": "Convent Garden",
-      "text": "Convent Garden",
+      "title": "Covent Garden",
+      "text": "Covent Garden",
       "position": {
         "lat": 51.51308,
         "lon": -0.12427
@@ -677,8 +677,8 @@
       }
     },
     "GloucsterRoad": {
-      "title": "Gloucster Road",
-      "text": "Gloucster \nRoad",
+      "title": "Gloucester Road",
+      "text": "Gloucester \nRoad",
       "position": {
         "lat": 51.49408266,
         "lon": -0.17295341
@@ -917,22 +917,22 @@
       }
     },
 "HunslowCentral": {
-      "title": "Hunslow Central",
-      "text": "Hunslow Central",
+      "title": "Hounslow Central",
+      "text": "Hounslow Central",
       "position": {
         "lat": 51.471290,
         "lon": -0.365853
       }
     },"HunslowWest": {
-      "title": "Hunslow West",
-      "text": "Hunslow West",
+      "title": "Hounslow West",
+      "text": "Hounslow West",
       "position": {
         "lat": 51.4715,
         "lon": -0.386471
       }
     },"HunslowEast": {
-      "title": "Hunslow East",
-      "text": "Hunslow East",
+      "title": "Hounslow East",
+      "text": "Hounslow East",
       "position": {
         "lat": 51.473540,
         "lon": -0.356000
@@ -1079,7 +1079,7 @@
       }
     },
     "LeytonStone": {
-      "title": "LeytonStone",
+      "title": "Leytonstone",
       "position": {
         "lat": 51.56828,
         "lon": 0.00739
@@ -1270,8 +1270,8 @@
       }
     },
     "Northholt": {
-      "title": "Northholt",
-      "text": "Northholt",
+      "title": "Northolt",
+      "text": "Northolt",
       "position": {
         "lat": 51.548054,
         "lon": -0.368257
@@ -1326,7 +1326,7 @@
       }
     },
     "Osterly": {
-      "title": "Osterly",
+      "title": "Osterley",
       "text": "Osterley",
       "position": {
         "lat": 51.481569,
@@ -1430,8 +1430,8 @@
       }
     },
     "QueensPark": {
-      "title": "Queens Park",
-      "text": "Queens Park",
+      "title": "Queen's Park",
+      "text": "Queen's Park",
       "position": {
         "lat": 51.534179,
         "lon": -0.205257721
@@ -1478,8 +1478,8 @@
       }
     },
     "RegentsPark": {
-      "title": "Regents Park",
-      "text": "Regents Park",
+      "title": "Regent's Park",
+      "text": "Regent's Park",
       "position": {
         "lat": 51.52344,
         "lon": -0.14713
@@ -1566,16 +1566,16 @@
       }
     },
     "ShepardsBush": {
-      "title": "Shepard's Bush",
-      "text": "Shepard's \nBush",
+      "title": "Shepherd's Bush",
+      "text": "Shepherd's \nBush",
       "position": {
         "lat": 51.50474,
         "lon": -0.21881
       }
     },
     "ShepardsBushMarket": {
-      "title": "Shepard's Bush Market",
-      "text": "Shepard's Bush Market",
+      "title": "Shepherd's Bush Market",
+      "text": "Shepherd's Bush Market",
       "position": {
         "lat": 51.506063,
         "lon": -0.226231
@@ -1661,8 +1661,8 @@
       }
     },
     "SouthGate": {
-      "title": "South Gate",
-      "text": "South Gate",
+      "title": "Southgate",
+      "text": "Southgate",
       "position": {
         "lat": 51.63240,
         "lon": -0.12765
@@ -1678,8 +1678,8 @@
       }
     },
     "StJohnsWood": {
-      "title": "St. Johns Wood",
-      "text": "St. Johns Wood",
+      "title": "St. John's Wood",
+      "text": "St. John's Wood",
       "position": {
         "lat": 51.53472,
         "lon": -0.17428

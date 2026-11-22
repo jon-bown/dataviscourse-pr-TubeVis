@@ -187,7 +187,17 @@ text.highlighted {
 .label {
   transition-property: opacity;
   transition-duration: .5s;
+  /* Scale each label around itself, not around the centre of the whole SVG */
+  transform-box: fill-box;
   transform-origin: 50% 50%;
+}
+
+.line-station-label:hover {
+  text-decoration: underline;
+}
+
+.line-station-label.selectedName {
+  font-weight: bold;
 }
 
 .label.translucent {
@@ -289,11 +299,15 @@ text.highlighted {
 }
 
 .stationSelected{
-  fill: steelblue;
+  fill: #2a78d6;
 }
 
 .stationSelect:hover{
-  fill: orange;
+  fill: #b7d3f6;
+}
+
+.compareSelected{
+  fill: #eb6834;
 }
 
 .mainBarWrapper {
@@ -400,4 +414,274 @@ text.highlighted {
 }
 .showMe {
   display: flex;
+}
+
+/* ---- Layout (previously inline styles in index.html) ---- */
+body {
+  background: #fff;
+}
+
+.roundel {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+
+.roundel img {
+  width: 100px;
+  height: 80px;
+}
+
+#floating-panel1 {
+  margin-left: 30px;
+  margin-bottom: 10px;
+}
+
+#floating-panel1 h1,
+#floating-panel1 h5 {
+  text-align: center;
+}
+
+#floating-panel1 button {
+  font: inherit;
+  margin-left: 4px;
+}
+
+#floating-panel1 button:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+#tube-map {
+  width: 80%;
+  height: 80%;
+  margin: 0 30px 30px 30px;
+}
+
+.clock,
+.journey {
+  float: right;
+  text-align: center;
+}
+
+/* Yearly entry/exit line chart paths are lines, not filled areas */
+.linechart path.line {
+  fill: none;
+  stroke-width: 2;
+}
+
+
+#back-to-map {
+  align-self: flex-start;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+/* ---- Straightened-line view: page scrolls; station charts sit between
+   the menus and the line, which moves down to make room ---- */
+body.line-mode {
+  overflow-y: auto;
+}
+
+#tube-map {
+  display: flex;
+  flex-direction: column;
+}
+
+#tube-map > .barChartWrapper {
+  order: 1;
+}
+
+#tube-map > #container {
+  order: 2;
+  flex: none;
+}
+
+/* ---- Station survey charts ---- */
+.barChartWrapper {
+  --chart-surface: #ffffff;
+  --chart-border: #e4e2dc;
+  --chart-hover: #f4f3ef;
+  --chart-grid: #ebe9e4;
+  --chart-baseline: #c9c7c0;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #76756f;
+  width: 100%;
+  max-width: 1400px;
+  padding-bottom: 8px;
+  scroll-margin-top: 12px;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text-primary);
+}
+
+.barChartWrapper.showMe {
+  display: block;
+}
+
+.surveyHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 20px;
+  margin: 4px 0 14px;
+}
+
+.surveyHeader h2 {
+  margin: 0;
+  font: 24px 'Hammersmith One', sans-serif;
+  color: var(--text-primary);
+}
+
+.surveyLegend {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.surveyLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.surveyLegendItem .swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.surveyNote {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.surveyGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.surveyCard {
+  margin: 0;
+  padding: 14px 16px 10px;
+  background: var(--chart-surface);
+  border: 1px solid var(--chart-border);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  min-width: 0;
+}
+
+.surveyCard figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.surveyTitle {
+  font: 17px 'Hammersmith One', sans-serif;
+  color: var(--text-primary);
+}
+
+.surveySub {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.surveyChart {
+  display: block;
+  overflow: visible;
+}
+
+.surveyChart text {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+  user-select: none;
+}
+
+.surveyChart .category-label {
+  fill: var(--text-primary);
+  font-size: 12px;
+}
+
+.surveyChart .value-label {
+  fill: var(--text-secondary);
+  font-size: 11px;
+}
+
+.surveyChart .tick-labels text {
+  fill: var(--text-muted);
+  font-size: 10px;
+}
+
+.surveyChart .grid line {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+
+.surveyChart .baseline {
+  stroke: var(--chart-baseline);
+  stroke-width: 1;
+}
+
+.surveyChart .rowHover {
+  fill: transparent;
+  rx: 4px;
+}
+
+.surveyChart .surveyRow:hover .rowHover {
+  fill: var(--chart-hover);
+}
+
+.chart-tooltip {
+  position: fixed;
+  z-index: 10;
+  min-width: 160px;
+  padding: 8px 10px;
+  pointer-events: none;
+  background: #ffffff;
+  border: 1px solid #e4e2dc;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font: 12px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #0b0b0b;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.chart-tooltip.visible {
+  opacity: 1;
+}
+
+.chart-tooltip .tt-title {
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.chart-tooltip .tt-row {
+  display: grid;
+  grid-template-columns: 10px 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-tooltip .tt-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.chart-tooltip .tt-value {
+  font-weight: 600;
+}
+
+.chart-tooltip .tt-count {
+  color: #52514e;
 }

@@ -1,153 +1,146 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>6630 London Tube Project</title>
-    <head>
-        <link rel="stylesheet" href="tubeMap.css">
-				<audio id="tubesounds" src="audio/TubeSounds.mp3"></audio>
-        <script src="https://d3js.org/d3.v4.js"></script>
-        <script src=d3-tube-map/d3-tube-map.js></script>
-        <script src=script.js></script>
-        <link href='https://fonts.googleapis.com/css?family=Hammersmith+One' rel='stylesheet' type='text/css'>
-
-    </head>
-    <a href="https://tfl.gov.uk/modes/tube/">
-        <img src="https://vignette.wikia.nocookie.net/logopedia/images/3/3a/London_Underground_1970_roundel_small.png/revision/latest?cb=20120209090410" href="https://tfl.gov.uk/modes/tube/" style="float: right; width: 100px; height: 80px" />
-    </a>
-
-
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hammersmith+One&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="tubeMap.css">
+    <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+    <script src="js/tubeData.js"></script>
+    <script src="d3-tube-map/d3-tube-map.js"></script>
+</head>
 <body>
 
-	<div class="linechart">
-			<div class="close">Close</div>
-			<div class="station"></div>
-			<div class="legends">
-					<div class="sunday">Sunday</div>
-					<div class="saturday">Saturday</div>
-					<div class="week">Week</div>
-			</div>
-			<div class="chartWrapper">
-					<div class="entry"></div>
-					<div class="exit"></div>
-			</div>
-	</div>
+<audio id="tubesounds" src="audio/TubeSounds.mp3" preload="auto"></audio>
 
-<div id="floating-panel1" style ="margin-left:30px;  margin-bottom:10px;">
-    <h1 style = "text-align: center">A Typical Day on the Tube: Who goes where? And When?</h1>
-		<h5 style = "text-align: center">Click Animation Button to Start; Scroll to Zoom; Click and Drag Map; Click Line for more data</h5>
+<a href="https://tfl.gov.uk/modes/tube/" class="roundel" target="_blank" rel="noopener">
+    <img src="https://vignette.wikia.nocookie.net/logopedia/images/3/3a/London_Underground_1970_roundel_small.png/revision/latest?cb=20120209090410"
+         alt="London Underground" width="100" height="80">
+</a>
 
-    Select Data Type:
-    <select id = "entry-exit">
-        <option value="null"> -- select an option -- </option>
-        <option value="both">Both Entry & Exit</option>
+<div class="linechart">
+    <div class="close" role="button" tabindex="0">Close</div>
+    <div class="station"></div>
+    <div class="legends">
+        <div class="sunday">Sunday</div>
+        <div class="saturday">Saturday</div>
+        <div class="week">Week</div>
+    </div>
+    <div class="chartWrapper">
+        <div class="entry"></div>
+        <div class="exit"></div>
+    </div>
+</div>
+
+<div id="floating-panel1">
+    <h1>A Typical Day on the Tube: Who goes where? And When?</h1>
+    <h5>Click Animation Button to Start; Scroll to Zoom; Click and Drag Map; Click Line for more data</h5>
+
+    <label for="entry-exit">Select Data Type:</label>
+    <select id="entry-exit">
+        <option value="null"> -- select an option --</option>
+        <option value="both">Both Entry &amp; Exit</option>
         <option value="entry">Entry</option>
         <option value="exit">Exit</option>
-        <!-- <option value="2009">2009</option>
-        <option value="2010">2010</option> -->
     </select>
 
-    <button id = "tube-button" onclick = "startTimeAnimation()">A Day on the Tube Animation</button>
-
-    <!-- <text id="clock" style="text-align: center; float: right"></text>
-    <text id ="journey" style="text-align: center; float: right"></text> -->
-
-
+    <button id="tube-button" type="button">A Day on the Tube Animation</button>
+    <span id="animation-controls" hidden>
+        <button id="stopButton" class="button" type="button">Stop Animation</button>
+        <button id="pause" class="button" type="button">Pause Audio</button>
+        <button id="volup" class="button" type="button">Vol +</button>
+        <button id="voldown" class="button" type="button">Vol -</button>
+    </span>
 
     <div class="barChartDropDown">
-        <h4 class="lineMode">Select a Line; Then Select Station to Compare; Click the Line to return</h4>
+        <button id="back-to-map" class="button" type="button">&larr; Back to full map</button>
+        <h4 class="lineMode">Select a Station on the Line, then a Station to Compare. Click here for yearly counts.</h4>
         <div class="selectItems">
             <div class="dropleft"></div>
             <div class="dropRight"></div>
         </div>
-        <!--<button class="showBarDiff">Differences</button>-->
     </div>
 </div>
-<!-- <div id = "sidebar" style="float: right;">
 
-
-
-																					</div> -->
-<div id = "legend" class="legendWrapper" style = "vertical-align:top;">
-
-  <div id ="circlekey" style = "display:none">
-    <h3  >Circle Key:</h3>
-    <div style="clear: both;">
-      <div class="keyLineItem" style="background-color: red;">&nbsp;</div><div class="keyItemText">Entries</div>
-      <div style="clear: both;"><div class="keyLineItem" style="background-color: #00A4A7;">&nbsp;</div><div class="keyItemText">Exits</div>
+<div id="legend" class="legendWrapper">
+    <div id="circlekey" style="display:none">
+        <h3>Circle Key:</h3>
+        <div style="clear: both;">
+            <div class="keyLineItem" style="background-color: red;">&nbsp;</div>
+            <div class="keyItemText">Entries</div>
+            <div style="clear: both;">
+                <div class="keyLineItem" style="background-color: #00A4A7;">&nbsp;</div>
+                <div class="keyItemText">Exits</div>
+            </div>
+        </div>
     </div>
-  </div>
-  </div>
-	<div>
-		<h3>Other Views:</h3>
-	<ul>
-			<li><a href="map.html">Google Map</a></li>
-			<li><a href="video.html">Demo Video</a></li>
-	</ul>
-</div>
+    <div>
+        <h3>Other Views:</h3>
+        <ul>
+            <li><a href="map.html">Station Map</a></li>
+            <li><a href="video.html">Demo Video</a></li>
+        </ul>
+    </div>
 
-
-	<text id="clock" class = "clock" style="text-align: center; float: right"></text><div style="clear: both;"></div>
-	<text id ="journey" class = "journey" style="text-align: center; float: right"></text>
+    <div id="clock" class="clock"></div>
+    <div style="clear: both;"></div>
+    <div id="journey" class="journey"></div>
     <div class="legendTitle">Legends</div>
     <div class="stationLegend"></div>
-      <div style="clear: both;">&nbsp;</div>
+    <div style="clear: both;">&nbsp;</div>
 </div>
 
 
-<div id="tube-map" style ="width:80%; height:80%;margin-left:30px; margin-right:30px; margin-bottom: 30px;">
-  <div class="barChartWrapper" style = "margin-bottom: 300px margin-right:30px;">
-
-      <div class="innerBarChart ageWrapper">
-          <div class="label">Age</div>
-          <div class="ageChart"></div>
-      </div>
-      <div class="innerBarChart sexWrapper">
-          <div class="label">Sex</div>
-          <div class="sexChart"></div>
-      </div>
-
-      <div class="innerBarChart journeyWrapper">
-          <div class="label">Journey</div>
-          <div class="journeyChart"></div>
-      </div>
-
-      <div class="innerBarChart marketWrapper">
-          <div class="label">Market</div>
-          <div class="marketChart"></div>
-      </div>
+<div id="tube-map">
+    <section class="barChartWrapper" aria-label="Station survey charts">
+        <div class="surveyHeader"></div>
+        <div class="surveyGrid">
+            <figure class="surveyCard">
+                <figcaption><span class="surveyTitle">Age</span><span class="surveySub">Age group, years</span></figcaption>
+                <div class="ageChart" data-title="Age"></div>
+            </figure>
+            <figure class="surveyCard">
+                <figcaption><span class="surveyTitle">Sex</span><span class="surveySub">Respondents</span></figcaption>
+                <div class="sexChart" data-title="Sex"></div>
+            </figure>
+            <figure class="surveyCard">
+                <figcaption><span class="surveyTitle">Journey time</span><span class="surveySub">Minutes</span></figcaption>
+                <div class="journeyChart" data-title="Journey time"></div>
+            </figure>
+            <figure class="surveyCard">
+                <figcaption><span class="surveyTitle">Market segment</span><span class="surveySub">Type of traveller</span></figcaption>
+                <div class="marketChart" data-title="Market segment"></div>
+            </figure>
+        </div>
+    </section>
 </div>
 
-
-
-
-
-</div>
 <script>
-    /*  <script src="https://unpkg.com/d3-tube-map@latest/build/d3-tube-map.js"></scr>  */
-    var el = document.getElementById('tube-map');
-    var width = 1600;
-    var height = 1024;
+    const el = document.getElementById('tube-map');
+    const width = 1600;
+    const height = 1024;
 
     const ageInCSV = ["Under 16", "16 - 19", "20 - 24", "25 - 34", "35 - 44", "45 - 59", "60 - 64", "65 - 70", "Over 70"];
     const ageMap = new Map();
-    ageInCSV.forEach((d, i)=>ageMap.set(`cat${i}`, d));
+    ageInCSV.forEach((d, i) => ageMap.set(`cat${i}`, d));
 
-    const journeyInCSV = ["< 15 mins", "15 - 30", "30 - 45", "45 - 60", "60 - 90:", "over 90"];
+    const journeyInCSV = ["< 15 mins", "15 - 30", "30 - 45", "45 - 60", "60 - 90", "over 90"];
     const journeyMap = new Map();
-    journeyInCSV.forEach((d, i)=>journeyMap.set(`cat${i}`, d));
+    journeyInCSV.forEach((d, i) => journeyMap.set(`cat${i}`, d));
 
     const marketInCSV = ["Commuter", "Leisure", "Tourist", "Not known"];
     const marketMap = new Map();
-    marketInCSV.forEach((d, i)=>marketMap.set(`cat${i}`, d));
+    marketInCSV.forEach((d, i) => marketMap.set(`cat${i}`, d));
 
-    var svg = d3.select(el)
+    const svg = d3.select(el)
         .append('svg')
         .attr('width', width)
         .attr('height', height)
         .attr("id", "container");
-
 
     const map = tubeMap.tubeMap()
         .width(width)
@@ -159,292 +152,184 @@
             left: width / 7,
         });
 
-    d3.queue()
-        .defer(d3.json, 'stations.json')
-        .defer(d3.csv, 'tubedata/counts/2007_Entry_Exit.csv') // Line Charts
-        .defer(d3.csv, 'tubedata/counts/2008_Entry_Exit.csv')
-        .defer(d3.csv, 'tubedata/counts/2009_Entry_Exit.csv')
-        .defer(d3.csv, 'tubedata/counts/2010_Entry_Exit.csv')
-        .defer(d3.csv, 'tubedata/counts/2011_Entry_Exit.csv')
-        .defer(d3.csv, 'tubedata/counts/2012_Entry_Exit.csv')
-        .defer(d3.csv, 'tubedata/counts/2013_Entry_Exit.csv')
-        .defer(d3.csv, 'tubedata/counts/2014_Entry_Exit.csv')
-        .defer(d3.csv, 'tubedata/counts/2015_Entry_Exit.csv')
-        .defer(d3.csv, 'tubedata/counts/2016_Entry_Exit.csv')
+    // ---- Data loading -------------------------------------------------------
 
-        .defer(d3.csv, 'tubedata/RODS_2016/age/1.csv')  // For Bar Charts
-        .defer(d3.csv, 'tubedata/RODS_2016/age/2.csv')
-        .defer(d3.csv, 'tubedata/RODS_2016/journeytime/1.csv')
-        .defer(d3.csv, 'tubedata/RODS_2016/journeytime/2.csv')
-        .defer(d3.csv, 'tubedata/RODS_2016/market/1.csv')
-        .defer(d3.csv, 'tubedata/RODS_2016/market/2.csv')
-        .awaitAll(readyForData);
+    Promise.all([
+        d3.json('stations.json'),
+        Promise.all(TubeData.COUNT_YEARS.map(TubeData.loadCounts)),  // Line charts
+        d3.csv('tubedata/RODS_2016/age/1.csv'),                       // Bar charts
+        d3.csv('tubedata/RODS_2016/age/2.csv'),
+        d3.csv('tubedata/RODS_2016/journeytime/1.csv'),
+        d3.csv('tubedata/RODS_2016/journeytime/2.csv'),
+        d3.csv('tubedata/RODS_2016/market/1.csv'),
+        d3.csv('tubedata/RODS_2016/market/2.csv'),
+    ]).then(([stations, counts, age1, age2, journey1, journey2, market1, market2]) => {
+        const resolveStation = TubeData.stationIndex(stations.stations);
+        const withKeys = rows => rows.map(d => ({...d, keys: resolveStation(d.station)}));
 
-    function readyForData(error, response) {
-
-        if (error != null) {
-            console.log("something went wrong");
-        }
-
-        console.log(response, 'RESPONSE DATA')
-        const dataFactory = {
-            stations: response[0],
-            yeardata: [
-                {year: '2007', data: response[1]},
-                {year: '2008', data: response[2]},  // To Do other year attribute rename
-                {year: '2009', data: response[3]},
-                {year: '2010', data: response[4]},
-                {year: '2011', data: response[5]},
-                {year: '2012', data: response[6]},
-                {year: '2013', data: response[7]},
-                {year: '2014', data: response[8]},
-                {year: '2015', data: response[9]},
-                {year: '2016', data: response[10]},
-            ],
-            age: [response[11], response[12]],
-            journey: [response[13], response[14]],
-            market: [response[15], response[16]]
+        const dataStore = {
+            stations,
+            yearData: withKeys(counts.flat()),
+            ageData: withKeys(formatAgeSex([age1, age2])),
+            journeyData: withKeys(formatJourney([journey1, journey2])),
+            marketData: withKeys(formatMarket([market1, market2])),
         };
 
-        const yearData = formatEntryExit(dataFactory);
-        const ageData = formatAgeSex(dataFactory);
-        const journeyData = formatJourney(dataFactory);
-        const marketData = formatMaket(dataFactory);
-        const stationNames = extractStationNames(response[0].lines)
-        const dataStore = {stations: response[0], yearData, ageData, journeyData, marketData, stationNames}
-        addLegends(response[0]);
-
+        addLegends(stations);
         svg.datum(dataStore).call(map);
+    }).catch(error => {
+        console.error(error);
+        alert('Could not load the tube data. If you opened index.html directly from disk, ' +
+            'serve the folder over HTTP instead (see README).');
+    });
 
-    }
-
-    const addLegends = ({lines})=> {
-
-        const uniqueOnly = lines.filter((x, i, a) => a.findIndex(x=>x.name == a[i].name) == i)
+    const addLegends = ({lines}) => {
+        const uniqueOnly = lines.filter((x, i, a) => a.findIndex(y => y.name === x.name) === i);
 
         const select = d3.select('.stationLegend')
             .selectAll('div')
             .data(uniqueOnly)
-            .enter()
-            .append('div').classed('rowLegend', true)
+            .join('div')
+            .classed('rowLegend', true);
 
         select.append('div')
             .classed('legendColor', true)
-            .style('background', d=>d.color)
+            .style('background', d => d.color);
         select.append('div')
             .classed('legendName', true)
-            .text((d)=>d.name)
+            .text(d => d.name);
+    };
 
+    const totalDayOnly = (files, rowMapper) =>
+        files.flat().map(rowMapper).filter(d => d.period === 'Totalday');
 
+    const formatMarket = files => totalDayOnly(files, d => ({
+        cat0: parseFloat(d.Commuter),
+        cat1: parseFloat(d.Leisure),
+        cat2: parseFloat(d.Tourist),
+        cat3: parseFloat(d.Notknown),
+        nlc: d.NLC,
+        station: d.Station,
+        period: d.timePeriod
+    }));
+
+    const formatJourney = files => totalDayOnly(files, d => ({
+        cat0: parseFloat(d.cat0),
+        cat1: parseFloat(d.cat1),
+        cat2: parseFloat(d.cat2),
+        cat3: parseFloat(d.cat3),
+        cat4: parseFloat(d.cat4),
+        cat5: parseFloat(d.cat5),
+        nlc: d.NLC,
+        station: d.Station,
+        period: d.Timeperiod
+    }));
+
+    const formatAgeSex = files => totalDayOnly(files, d => ({
+        cat0: parseFloat(d.cat0),
+        cat1: parseFloat(d.cat1),
+        cat2: parseFloat(d.cat2),
+        cat3: parseFloat(d.cat3),
+        cat4: parseFloat(d.cat4),
+        cat5: parseFloat(d.cat5),
+        cat6: parseFloat(d.cat6),
+        cat7: parseFloat(d.cat7),
+        cat8: parseFloat(d.cat8),
+        period: d.timePeriod,
+        male: parseFloat(d.Male),
+        female: parseFloat(d.Female),
+        nlc: d.NLC,
+        station: d.Station
+    }));
+
+    // ---- "A Day on the Tube" animation -------------------------------------
+
+    const sound = document.getElementById('tubesounds');
+    const startButton = document.getElementById('tube-button');
+    const controls = document.getElementById('animation-controls');
+    const pauseButton = document.getElementById('pause');
+
+    // The clock runs from 05:00 through to 04:59 the next morning, one tick per minute
+    const buildTimeTable = () => {
+        const format = d3.timeFormat("%H:%M");
+        const date = new Date();
+        const hours = d3.range(5, 24).concat(d3.range(0, 5));
+        return hours.flatMap(h => d3.range(60).map(min => {
+            date.setHours(h, min, 0, 0);
+            return format(date);
+        }));
+    };
+
+    const stopAudio = () => {
+        sound.pause();
+        sound.currentTime = 0;
+    };
+
+    const onAnimationFinished = () => {
+        stopAudio();
+        controls.hidden = true;
+        startButton.disabled = false;
+    };
+
+    let animationData = null;  // cached [stations, AEI summary]
+
+    async function startTimeAnimation() {
+        const type = document.getElementById("entry-exit").value;
+        if (type === "null") {
+            alert("Please choose data type");
+            return;
+        }
+
+        startButton.disabled = true;
+        controls.hidden = false;
+        pauseButton.textContent = "Pause Audio";
+        map.setTimeStop();
+
+        sound.currentTime = 0;
+        sound.play().catch(() => { /* autoplay can be blocked; the animation still runs */ });
+
+        try {
+            animationData = animationData || await Promise.all([
+                d3.json("stations.json"),
+                d3.csv("tubedata/RODS_2016/Misc/Stationflows/AEI-Summary.csv"),
+            ]);
+        } catch (error) {
+            console.error(error);
+            onAnimationFinished();
+            return;
+        }
+
+        const [stationData, csvData] = animationData;
+        map.startTimer(csvData, buildTimeTable(), stationData, type, onAnimationFinished);
     }
 
+    startButton.addEventListener("click", startTimeAnimation);
 
-    const extractStationNames = linesNode => {
-        const nodes = linesNode.map((d, i)=> {
-            return d.nodes.map((e, f)=>({data: e, key: i}))
-        }).reduce((a, b)=>a.concat(b), [])
+    document.getElementById("stopButton").addEventListener("click", () => map.endTimer());
 
-        const extractNames = linesNode.map((node, i)=>nodes
-            .filter(d=>d.key === i)
-            .map(d=>d.data.name)
-            .filter(d=>d !== undefined))
-        return extractNames;
-    }
+    // Leave the straightened-line view
+    const returnToFullMap = () => map.returnToFullMap && map.returnToFullMap();
+    document.getElementById("back-to-map").addEventListener("click", returnToFullMap);
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") returnToFullMap();
+    });
 
-    const formatMaket = ({market}) => {
-        const marketCollection = market.map(item=> {
-            return item.map(d=>(
-                {
-                    'cat0': parseFloat(d.Commuter),
-                    'cat1': parseFloat(d.Leisure),
-                    'cat2': parseFloat(d.Tourist),
-                    'cat3': parseFloat(d.Notknown),
-                    nlc: d.NLC,
-                    station: d.Station,
-                    period: d.timePeriod
-                }))
-        })
-        return marketCollection.reduce((a, b)=>a.concat(b), []).filter(d=>d.period === 'Totalday')
+    pauseButton.addEventListener("click", () => {
+        if (sound.paused) {
+            sound.play().catch(() => {});
+            pauseButton.textContent = "Pause Audio";
+        } else {
+            sound.pause();
+            pauseButton.textContent = "Play Audio";
+        }
+    });
 
-    }
-
-    const formatJourney = ({journey})=> {
-        const journeyCollection = journey.map(item=> {
-            return item.map(d=>(
-                {
-                    'cat0': parseFloat(d.cat0),
-                    'cat1': parseFloat(d.cat1),
-                    'cat2': parseFloat(d.cat2),
-                    'cat3': parseFloat(d.cat3),
-                    'cat4': parseFloat(d.cat4),
-                    'cat5': parseFloat(d.cat5),
-                    nlc: d.NLC,
-                    station: d.Station,
-                    period: d.Timeperiod
-                }))
-        });
-
-        return journeyCollection.reduce((a, b)=>a.concat(b), []).filter(d=>d.period === 'Totalday')
-    }
-
-    const formatAgeSex = ({age}) => {
-        const ageCollection = age.map(item=> {
-            return item.map(d=>(
-                {
-                    'cat0': parseFloat(d.cat0),
-                    'cat1': parseFloat(d.cat1),
-                    'cat2': parseFloat(d.cat2),
-                    'cat3': parseFloat(d.cat3),
-                    'cat4': parseFloat(d.cat4),
-                    'cat5': parseFloat(d.cat5),
-                    'cat6': parseFloat(d.cat6),
-                    'cat7': parseFloat(d.cat7),
-                    'cat8': parseFloat(d.cat8),
-                    period: d.timePeriod,
-                    male: parseFloat(d.Male),
-                    female: parseFloat(d.Female),
-                    nlc: d.NLC,
-                    station: d.Station
-                }))
-        })
-
-        return ageCollection.reduce((a, b)=>a.concat(b), []).filter(d=>d.period === 'Totalday')
-    }
-
-
-    function formatEntryExit({yeardata}) {
-        const yearCollection = yeardata.map(year=> {
-            return year.data.map(d=> ({
-                year: year.year,
-                entry_saturday: parseFloat(d.Entry_Saturday),
-                entry_sunday: parseFloat(d.Entry_Sunday),
-                entry_week: isNaN(parseFloat(d.Entry_Week)) ? 0 : parseFloat(d.Entry_Week),
-                exit_saturday: parseFloat(d.Exit_Saturday),
-                exit_sunday: parseFloat(d.Exit_Sunday),
-                exit_week: isNaN(parseFloat(d.Exit_Week)) ? 0 : parseFloat(d.Exit_Week),
-                station: d.Station,//.trim().replace(/ /g, ''),
-                milliion: d.million,
-                nlc: d.nlc
-            }))
-        })
-
-        return yearCollection.reduce((a, b)=>a.concat(b), []);
-    }
-
-
-    function startTimeAnimation(){
-
-			var menu = document.getElementById("entry-exit");
-			var type = menu.options[menu.selectedIndex].value;
-
-			if(type === "null"){
-				alert("Please choose data type");
-				return;
-			}
-
-			var button = document.getElementById("tube-button");
-			button.removeAttribute('onclick');
-
-			d3.select("#floating-panel1").append("input").attr("type","button").attr("class","button").attr("value", "Stop Animation").attr("id","stopButton");
-
-			var stopButton = document.getElementById("stopButton");
-
-			stopButton.addEventListener("click", function() {
-				var sound = document.getElementById('tubesounds');
-
-				sound.pause();
-
-				sound.currentTime = 0;
-
-				d3.select("#pause").remove();
-				d3.select("#volup").remove();
-				d3.select("#voldown").remove();
-
-
-		map.endTimer();
-}, false);
-
-d3.select("#floating-panel1").append("input").attr("type","button").attr("class","button").attr("value", "Pause Audio").attr("id","pause");
-
-var pauseButton = document.getElementById("pause");
-
-pauseButton.addEventListener("click", function() {
-
-	var attr = d3.select(this).attr("value");
-
-	if(attr === "Pause Audio"){
-		d3.select(this).attr("value", "Play Audio");
-		document.getElementById('tubesounds').pause();
-	}else{
-		d3.select(this).attr("value", "Pause Audio");
-		document.getElementById('tubesounds').play();
-	}
-
-
-}, false);
-
-d3.select("#floating-panel1").append("input").attr("type","button").attr("class","button").attr("value", "Vol +").attr("id","volup");
-
-var upButton = document.getElementById("volup");
-
-upButton.addEventListener("click", function() {
-	document.getElementById('tubesounds').volume+=0.1;
-}, false);
-d3.select("#floating-panel1").append("input").attr("type","button").attr("class","button").attr("value", "Vol -").attr("id","voldown");
-
-var downButton = document.getElementById("voldown");
-
-downButton.addEventListener("click", function() {
-	document.getElementById('tubesounds').volume-=0.1;
-}, false);
-
-		map.setTimeStop();
-			//Change aesthetics so that the visualization looks Good
-			//start a timer
-			//map.highlightLine("Metropolitan");
-			document.getElementById('tubesounds').play();
-			d3.json("stations.json", function(error, data) {
-				if(error != null){
-					console.log("something went wrong");
-				}
-			d3.csv("tubedata/RODS_2016/Misc/Stationflows/AEI-Summary.csv", function(error, csvData){
-				var timeTable = [];
-						var myDate = new Date();
-						let stripMilliseconds_all = function(s) { return s.slice(0, -1); };
-									var format_entry = d3.timeFormat("%H:%M");
-				//The clock starts at 5 am
-				for(var i = 5; i <= 24; i++){
-					if(i === 24){
-						for(var j = 0; j < 5; j++){
-						for(var min = 0; min < 60; min++){
-							myDate.setHours(j, min, 0, 0);
-							time_stamp = format_entry(myDate);
-							timeTable.push(time_stamp);
-						}
-					}
-					}
-					else{
-					for(var min = 0; min < 60; min++){
-						myDate.setHours(i, min, 0, 0);
-						time_stamp = format_entry(myDate);
-						timeTable.push(time_stamp);
-					}
-				}
-				}
-				var menu = document.getElementById("entry-exit");
-				var type = menu.options[menu.selectedIndex].value;
-
-				map.startTimer(csvData, timeTable, data, type);
-			});
-			});
-
-
-			//select the data that meets the timer
-		}
-  </script>
-
-</body>
-<script>
+    const changeVolume = delta => {
+        sound.volume = Math.min(1, Math.max(0, sound.volume + delta));
+    };
+    document.getElementById("volup").addEventListener("click", () => changeVolume(0.1));
+    document.getElementById("voldown").addEventListener("click", () => changeVolume(-0.1));
 </script>
 
+</body>
 </html>

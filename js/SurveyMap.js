@@ -1,952 +1,155 @@
 /*
-*Class that constructs objects on top of the survey data google map
-*
-*/
-class SurveyMap {
+ * Leaflet overlays for the 2016 RODS survey data (requires Map.js)
+ */
+
+const ACCESS_COLUMNS = {
+    'NR/DLR/Tram': 'NR/DLR/Tram',
+    'Bus/Coach': 'Bus/Coach',
+    'Bicycle': 'Bicycle',
+    'Motorcycle': 'Motorcycle',
+    'Car/Van Parked': 'Car/VanParked',
+    'Car/Van driven away': 'Car/Vandrivenaway',
+    'Walked': 'Walked',
+    'Taxi/ Minicab': 'Taxi/Minicab',
+    'RiverBus/Ferry': 'RiverBus/Ferry',
+    'Other': 'Other',
+    'Heathrow Terminal 1': 'Heathrow_Terminal_1',
+    'Heathrow Terminal 2': 'Heathrow_Terminal_2',
+    'Heathrow Terminal 3': 'Heathrow_Terminal_3',
+    'Heathrow Terminal 4': 'Heathrow_Terminal_4',
+    'Heathrow Terminal 5': 'Heathrow_Terminal_5',
+};
+
+const JOURNEY_TIME_COLUMNS = {
+    'Average': 'Average',
+    '< 15 mins': 'l_15_mins',
+    '15 - 30': 'f15_30',
+    '30 - 45': 'f30_45',
+    '45 - 60': 'f45_60',
+    '60 - 90': 'f60_90',
+    'over 90': 'over_90',
+};
+
+const menuValue = id => {
+    const el = document.getElementById(id);
+    return el ? el.value : '';
+};
+
+// Bubble size relative to the mean of the values (as in the original project)
+const relativeTo = (divisor, adjust = c => c) => values => {
+    const change = adjust(d3.mean(values, v => v / divisor));
+    return v => v / change;
+};
+
+/*
+ * One entry per survey statistic:
+ *  file     - CSV to read
+ *  period   - column holding the time period (filtered with the "dayMenu"), if any
+ *  value    - (row, menus) => number for the selected category
+ *  radius   - values => (value => circle radius in metres)
+ */
+const SURVEYS = {
+    avtime: {
+        file: 'tubedata/RODS_2016/Exit/Average journey time/station.csv',
+        period: 'Time_period',
+        value: (row, m) => +row[JOURNEY_TIME_COLUMNS[m.category]],
+        radius: relativeTo(100),
+    },
+    distancekm: {
+        file: 'tubedata/RODS_2016/Entry/Distance_travelled/By_station.csv',
+        value: (row, m) => {
+            const column = {'<1 km': 'l1km', '30+ kms': '30pkms'}[m.category] || m.category;
+            return +row[column] / +row.Total;
+        },
+        radius: () => v => v * 10000,
+    },
+    avdistance: {
+        file: 'tubedata/RODS_2016/Exit/Distance travelled/Totals.csv',
+        // "Total passenger kilometres" -> Total_passenger_kilometres, "Average journey length (kms)" -> Average_journey_length
+        value: (row, m) => +row[m.category.split(' ').slice(0, 3).join('_')],
+        radius: relativeTo(500),
+    },
+    access: {
+        file: 'tubedata/RODS_2016/Entry/Access mode/Access.csv',
+        period: 'Time_period',
+        value: (row, m) => +row[ACCESS_COLUMNS[m.category]],
+        radius: values => {
+            const scale = relativeTo(90, c => c < 0.05 ? 0.1 : c)(values);
+            return v => scale(v) * 5;
+        },
+    },
+    purpose: {
+        file: 'tubedata/RODS_2016/Entry/Journey purpose/journey purpose.csv',
+        period: 'Time period',
+        value: (row, m) => {
+            if (m.place === 'Destination Purpose') return +row['D' + m.category];
+            // Origin "Work" and "Home" are split over two columns
+            if (m.category === 'Work' || m.category === 'Home') return +row[m.category + '1'] + +row[m.category + '2'];
+            return +row[m.category];
+        },
+        radius: relativeTo(80, c => c < 0.05 ? 0.1 : (c > 10 && c < 100 ? 100 : c)),
+    },
+};
+
+class SurveyMap extends OverlayMap {
 
     /**
-     *Constructor for the map class
-     * @param map instance of google map object
-     * @param stationData data of station
+     * @param map Leaflet map instance
+     * @param stations stations.json "stations" object
      */
-    constructor(map, stationData) {
-
-        this.map = map;
-
-        //instance of heatmap
-        this.heatmap = null;
-
-        //Keeps track of the current markers on the map
-        this.markers = [];
-
-        //Keeps track of the actual station data with latitude and longitude
-        this.stations = stationData;
-
+    constructor(map, stations) {
+        super(map);
+        this.stations = stations;
+        this.resolve = TubeData.stationIndex(stations);
+        this.csvCache = new Map();
     }
 
-
-    /**
-     *
-     *@param map instance of google map object
-     *
-     */
-    setCircles(map, type) {
-
-        d3.selectAll(".circle").remove();
-
-        //Use of this instance inside CSV methods
-        let self_item = this;
-        let citymap = [];
-
-        if (type === "avtime") {
-
-            let e = document.getElementById("categoryMenu");
-            let cate = e.options[e.selectedIndex].value;
-
-            let f = document.getElementById("dayMenu");
-            let day = f.options[f.selectedIndex].value;
-
-            //Retrieve the necessary data
-            d3.csv("tubedata/RODS_2016/Exit/Average journey time/station.csv", function (csvData) {
-                csvData.forEach(function (da, i) {
-                    da.Average     = +da.Average;
-                    da.l_15_mins   = +da.l_15_mins;
-                    da.f15_30      = +da.f15_30;
-                    da.f30_45      = +da.f30_45;
-                    da.f45_60      = +da.f45_60;
-                    da.f60_90      = +da.f60_90;
-                    da.over_90     = +da.over90
-                });
-                self_item.stations.forEach(function (d, i) {
-                    let val = csvData.filter(function (n) {
-                      return n.Station.trim() === d.title.trim() && n.Time_period.trim() === day;
-                    });
-
-                    let currCate = {
-                      'Average': 'Average',
-                      '< 15 mins': 'l_15_mins',
-                      '15 - 30': 'f15_30',
-                      '30 - 45': 'f30_45',
-                      '45 - 60': 'f45_60',
-                      '60 - 90': 'f60_90',
-                      'over 90': 'over_90'
-                    };
-
-                    if (val[0]) {
-                        citymap.push({
-                          title: d.title,
-                            center: {lat: d.position.lat, lng: d.position.lon},
-                            radius: (val[0][currCate[cate]] > 0 ? val[0][currCate[cate]] : 1)
-                        });
-
-                    }
-                });
-
-                let radMulti = [];
-                citymap.forEach(function(d) {
-                  radMulti.push(d.radius / 100);
-                });
-
-                for (let city in citymap) {
-                  let cityCircle = new google.maps.Circle({
-                    class: 'circle',
-                    strokeColor: '#FF0000',
-                    strokeOpacity: 0.8,
-                    strokeWeight: 1,
-                    fillColor: '#FF0000',
-                    fillOpacity: 0.25,
-                    map: map,
-                    center: citymap[city].center,
-                    radius: citymap[city].radius / d3.mean(radMulti)
-                  });
-                  self_item.markers.push(cityCircle);
-                }
-            });
+    loadCsv(file) {
+        if (!this.csvCache.has(file)) {
+            // Trim header names and cell values; the RODS exports are padded with spaces
+            this.csvCache.set(file, d3.csv(file, row => {
+                const clean = {};
+                Object.entries(row).forEach(([k, v]) => { clean[k.trim()] = typeof v === 'string' ? v.trim() : v; });
+                return clean;
+            }));
         }
-        else if (type === "distancekm") {
-            //Retrieve the necessary data
-            d3.csv("tubedata/RODS_2016/Entry/Distance_travelled/By_station.csv", function (error, csvData) {
-
-                let menu = document.getElementById("categoryMenu");
-                let kms = menu.options[menu.selectedIndex].value;
-
-                if (kms === "<1 km") {
-                    kms = "l1km";
-                }
-                else if (kms === "30+ kms") {
-                  kms = "30pkms";
-                }
-
-                //change necessary columns
-                csvData.forEach(function (da, i) {
-                    da["" + kms + ""] = + da["" + kms + ""] / da["Total"];
-                });
-
-                self_item.stations.forEach(function (d, i) {
-                    let val = csvData.filter(function (n) {
-                        return n.Station.trim() === d.title.trim();
-                    });
-                    if (val[0]) {
-                        //Construct object with all the information for heatmap based on what the user selects
-                        citymap.push({
-                            title: d.title,
-                            center: {lat: d.position.lat, lng: d.position.lon},
-                            kilo: val[0]["" + kms + ""]
-                        });
-                    }
-                });
-
-                for (let city in citymap) {
-                  let cityCircle = new google.maps.Circle({
-                    class: 'circle',
-                    strokeColor: '#FF0000',
-                    strokeOpacity: 0.8,
-                    strokeWeight: 1,
-                    fillColor: '#FF0000',
-                    fillOpacity: 0.25,
-                    map: map,
-                    center: citymap[city].center,
-                    radius: citymap[city].kilo * 10000
-                  });
-                  self_item.markers.push(cityCircle);
-                }
-            });
-        }
-        else if (type === "avdistance") {
-            //from Totals.csv
-            //Retrieve the necessary data
-            d3.csv("tubedata/RODS_2016/Exit/Distance travelled/Totals.csv", function (csvData) {
-                let menu = document.getElementById("categoryMenu");
-                let stat = menu.options[menu.selectedIndex].value;
-
-                stat = (stat.split(' ')).splice(0, 3).join('_');
-
-                //change necessary columns
-                csvData.forEach(function (da, i) {
-                    da["" + stat + ""] = +da["" + stat + ""];
-                });
-
-                self_item.stations.forEach(function (d, i) {
-                    let val = csvData.filter(function (n) {
-                        return n.Station.trim() === d.title.trim();
-                    });
-
-                    if (val[0]) {
-                        //Construct object with all the information for heatmap based on what the user selects
-                        citymap.push({
-                            title: d.title,
-                            center: {lat: d.position.lat, lng: d.position.lon},
-                            dist: val[0]["" + stat + ""]
-                        });
-                    }
-
-                });
-
-                let radMulti = [];
-                citymap.forEach(function(d) {
-                  radMulti.push(d.dist / 500);
-                });
-
-                console.log(d3.mean(radMulti))
-
-                for (let city in citymap) {
-                    // Add the circle for this city to the map.
-                    let cityCircle = new google.maps.Circle({
-                        class: "circle",
-                        strokeColor: '#FF0000',
-                        strokeOpacity: 0.8,
-                        strokeWeight: 1,
-                        fillColor: '#FF0000',
-                        fillOpacity: 0.25,
-                        map: map,
-                        center: citymap[city].center,
-                        //Here we set the radius according to some data gathered by the csv
-                        radius: citymap[city].dist / d3.mean(radMulti)
-
-                        //Math.sqrt(citymap[city].population) * 100
-                    });
-                    self_item.markers.push(cityCircle);
-                  }
-            });
-        }
-        else if (type === "access") {
-            //from Access.csv
-            //Retrieve the necessary data
-            d3.csv("tubedata/RODS_2016/Entry/Access mode/Access.csv", function (error, csvData) {
-                let menu1 = document.getElementById("categoryMenu");
-                let cat = menu1.options[menu1.selectedIndex].value;
-
-                cat = cat.split(' ').join('_');
-
-                let menu2 = document.getElementById("dayMenu");
-                let day = menu2.options[menu2.selectedIndex].value;
-
-                //change necessary columns
-                csvData.forEach(function (da) {
-                  da[cat] = +da[cat];
-                });
-
-                self_item.stations.forEach(function (d, i) {
-                    let val = csvData.filter(function (n) {
-                        return n.Station.trim() === d.title.trim() && n.Time_period.trim() === day;
-                    });
-
-                    if (val[0]) {
-                        //Construct object with all the information for heatmap based on what the user selects
-                        citymap.push({
-                            title: d.title,
-                            center: {lat: d.position.lat, lng: d.position.lon},
-                            num: val[0]["" + cat + ""]
-                        });
-                    }
-                });
-
-                let radMulti = [];
-                citymap.forEach(function(d) {
-                  let temp = d.num
-                  radMulti.push(d.num / 90);
-                });
-
-                let change = d3.mean(radMulti) < 0.05 ? 0.1 : d3.mean(radMulti);
-
-                console.log(change)
-
-                for (let city in citymap) {
-                    // Add the circle for this city to the map.
-                    let cityCircle = new google.maps.Circle({
-                        class: "circle",
-                        strokeColor: '#FF0000',
-                        strokeOpacity: 0.8,
-                        strokeWeight: 1,
-                        fillColor: '#FF0000',
-                        fillOpacity: 0.25,
-                        map: map,
-                        center: citymap[city].center,
-                        //Here we set the radius according to some data gathered by the csv
-                        radius: (citymap[city].num / change) * 5
-
-                        //Math.sqrt(citymap[city].population) * 100
-                    });
-                    self_item.markers.push(cityCircle);
-                  }
-            });
-        }
-        else if (type === "purpose") {
-          //from journey purpose
-          //Retrieve the necessary data
-          d3.csv("tubedata/RODS_2016/Entry/Journey purpose/journey purpose.csv", function (csvData) {
-              let menu1 = document.getElementById("categoryMenu");
-              let cat   = menu1.options[menu1.selectedIndex].value;
-
-              let menu2 = document.getElementById("placeMenu");
-              let place = menu2.options[menu2.selectedIndex].value;
-
-              let menu3 = document.getElementById("dayMenu");
-              let day   = menu3.options[menu3.selectedIndex].value;
-
-              if (place === "Destination Purpose")
-                cat = "D" + cat;
-
-              //change necessary columns
-              csvData.forEach(function (da) {
-                if (cat === "Work" || cat === "Home") {
-                  da[cat] = +da[cat + '1'] + da[cat + '2'];
-                }
-                else {
-                  da[cat] = +da[cat];
-                }
-              });
-
-              self_item.stations.forEach(function (d, i) {
-                  let val = csvData.filter(function (n) {
-                      return n.Station.trim() === d.title.trim() && n["Time period"].trim() === day;
-                  });
-
-                  if (val[0]) {
-                      //Construct object with all the information for heatmap based on what the user selects
-                      citymap.push({
-                          title: d.title,
-                          center: {lat: d.position.lat, lng: d.position.lon},
-                          num: parseInt(val[0]["" + cat + ""])
-                      });
-                  }
-              });
-
-              let radMulti = [];
-              citymap.forEach(function(d) {
-                radMulti.push(d.num / 80);
-              });
-
-              console.log(d3.mean(radMulti))
-
-              let change = d3.mean(radMulti) < 0.05 ? 0.1 : d3.mean(radMulti);
-
-              change = 10 < change && change < 100 ? 100 : change;
-
-              for (let city in citymap) {
-                  // Add the circle for this city to the map.
-                  let cityCircle = new google.maps.Circle({
-                      class: "circle",
-                      strokeColor: '#FF0000',
-                      strokeOpacity: 0.8,
-                      strokeWeight: 1,
-                      fillColor: '#FF0000',
-                      fillOpacity: 0.25,
-                      map: map,
-                      center: citymap[city].center,
-                      //Here we set the radius according to some data gathered by the csv
-                      radius: citymap[city].num / change
-
-                      //Math.sqrt(citymap[city].population) * 100
-                  });
-                  self_item.markers.push(cityCircle);
-                }
-
-          });
-        }
+        return this.csvCache.get(file);
     }
 
-//Methods used for clearing all the info off the map
+    /** Resolves to [{title, lat, lng, value}] for the selected survey statistic */
+    async stationValues(type) {
+        const survey = SURVEYS[type];
+        const menus = {category: menuValue('categoryMenu'), day: menuValue('dayMenu'), place: menuValue('placeMenu')};
+        if (!survey || !menus.category || (survey.period && !menus.day)) return null;
 
-    setMapOnAll(map) {
-        for (let i = 0; i < this.markers.length; i++) {
-            this.markers[i].setMap(map);
-        }
+        const rows = await this.loadCsv(survey.file);
+        const valueByKey = new Map();
+        rows
+            .filter(row => !survey.period || row[survey.period] === menus.day)
+            .forEach(row => this.resolve(row.Station).forEach(key => {
+                if (!valueByKey.has(key)) valueByKey.set(key, survey.value(row, menus));
+            }));
+
+        return Object.entries(this.stations)
+            .filter(([key, s]) => s.position && Number.isFinite(valueByKey.get(key)))
+            .map(([key, s]) => ({title: s.title.trim(), lat: s.position.lat, lng: s.position.lon, value: valueByKey.get(key)}));
     }
 
-    clearMarkers() {
-        this.setMapOnAll(null);
+    async setCircles(map, type) {
+        const id = this.nextRequest();
+        const values = await this.stationValues(type);
+        if (!values || !this.isCurrent(id)) return;
+        this.clearMarkers();
+        const radius = SURVEYS[type].radius(values.map(d => d.value));
+        const format = d3.format(',.3~f');
+        this.drawCircles(values.map(d => ({...d, radius: radius(d.value), label: `${d.title}: ${format(d.value)}`})));
     }
 
-    setHeatmap(map, type) {
-        d3.selectAll(".circle").remove();
-
-        let self_item = this;
-        let citymap = [];
-        let heatMapData = [];
-
-        if (type === "avtime") {
-            let e = document.getElementById("categoryMenu");
-            let cate = e.options[e.selectedIndex].value;
-
-            let f = document.getElementById("dayMenu");
-            let day = f.options[f.selectedIndex].value;
-
-            //Retrieve the necessary data
-            d3.csv("tubedata/RODS_2016/Exit/Average journey time/station.csv", function (csvData) {
-                csvData.forEach(function (da, i) {
-                    da.Average     = +da.Average;
-                    da.l_15_mins   = +da.l_15_mins;
-                    da.f15_30      = +da.f15_30;
-                    da.f30_45      = +da.f30_45;
-                    da.f45_60      = +da.f45_60;
-                    da.f60_90      = +da.f60_90;
-                    da.over_90     = +da.over90
-                });
-                self_item.stations.forEach(function (d, i) {
-                    let val = csvData.filter(function (n) {
-                      return n.Station.trim() === d.title.trim() && n.Time_period.trim() === day;
-                    });
-
-
-                    let currCate = {
-                      'Average': 'Average',
-                      '< 15 mins': 'l_15_mins',
-                      '15 - 30': 'f15_30',
-                      '30 - 45': 'f30_45',
-                      '45 - 60': 'f45_60',
-                      '60 - 90': 'f60_90',
-                      'over 90': 'over_90'
-                    };
-
-                    if (val[0]) {
-                        heatMapData.push({
-                            location: new google.maps.LatLng(d.position.lat, d.position.lon),
-                            weight: val[0][currCate[cate]]
-                        });
-
-                        //Construct object with all the information for the heatmap
-                        // citymap.push({
-                        //     title:      d.title,
-                        //     center:     {lat: d.position.lat, lng: d.position.lon},
-                        //     average:    val[0].Average,
-                        //     less15:     val[0].l_15_mins,
-                        //     f15to30:    val[0].f15_30,
-                        //     f30to45:    val[0].f30_45,
-                        //     f45to60:    val[0].f45_60,
-                        //     f60to90:    val[0].f60_90,
-                        //     over90:     val[0].over90
-                        // });
-                    }
-                });
-
-                //Code to add cluster markers
-                //
-                //         let markers = heatMapData.map(function(location, i) {
-                //           console.log(location.location);
-                //   return new google.maps.Marker({
-                //     position: location.location,
-                //     label: location.weight
-                //   });
-                // });
-                //
-                // // Add a marker clusterer to manage the markers.
-                // let markerCluster = new MarkerClusterer(map, markers,
-                //     {imagePath: 'https://developers.google.com/maps/documentation/javascript/examples/markerclusterer/m'});
-
-
-                self_item.heatmap = new google.maps.visualization.HeatmapLayer({
-                    data: heatMapData
-                });
-
-                self_item.heatmap.setMap(map);
-                self_item.heatmap.setOptions({
-                    radius: 15,
-                    maxIntensity: d3.max(heatMapData).weight,
-                    gradient: ['rgba(0, 255, 255, 0)',
-                        "#00FFFF",
-                        "#00EFFF",
-                        "#00DFFF",
-                        "#00D0FF",
-                        "#00C0FF",
-                        "#00B0FF",
-                        "#00A1FF",
-                        "#0091FF",
-                        "#0082FF",
-                        "#0072FF",
-                        "#0062FF",
-                        "#0053FF",
-                        "#0043FF",
-                        "#0034FF",
-                        "#0024FF",
-                        "#0014FF",
-                        "#0005FF",
-                        "#0A00FF",
-                        "#1A00FF",
-                        "#2900FF",
-                        "#3900FF",
-                        "#4800FF",
-                        "#5800FF",
-                        "#6800FF",
-                        "#7700FF",
-                        "#8700FF",
-                        "#9600FF",
-                        "#A600FF",
-                        "#B600FF",
-                        "#C500FF",
-                        "#D500FF",
-                        "#E400FF",
-                        "#F400FF",
-                        "#FF00F9",
-                        "#FF00EA",
-                        "#FF00DA",
-                        "#FF00CA",
-                        "#FF00BB",
-                        "#FF00AB",
-                        "#FF009C",
-                        "#FF008C",
-                        "#FF007C",
-                        "#FF006D",
-                        "#FF005D",
-                        "#FF004E",
-                        "#FF003E",
-                        "#FF002E",
-                        "#FF001F",
-                        "#FF000F",
-                        "#FF0000"]
-                });
-
-                self_item.markers.push(self_item.heatmap);
-            });
-        }
-        else if (type === "distancekm") {
-            //Retrieve the necessary data
-            d3.csv("tubedata/RODS_2016/Entry/Distance_travelled/By_station.csv", function (error, csvData) {
-
-                let menu = document.getElementById("categoryMenu");
-                let kms = menu.options[menu.selectedIndex].value;
-
-                if (kms === "<1 km") {
-                    kms = "l1km";
-                }
-                else if (kms === "30+ kms") {
-                  kms = "30pkms";
-                }
-
-                //change necessary columns
-                csvData.forEach(function (da, i) {
-                    da["" + kms + ""] = + da["" + kms + ""] / da["Total"];
-                });
-
-                self_item.stations.forEach(function (d, i) {
-                    let val = csvData.filter(function (n) {
-                        return n.Station.trim() === d.title.trim();
-                    });
-                    if (val[0]) {
-                        //Construct object with all the information for heatmap based on what the user selects
-                        citymap.push({
-                            title: d.title,
-                            center: {lat: d.position.lat, lng: d.position.lon},
-                            kilo: val[0]["" + kms + ""]
-                        });
-                    }
-
-                    for (let city in citymap) {
-                        heatMapData.push({
-                            location: new google.maps.LatLng(citymap[city].center.lat, citymap[city].center.lng),
-                            weight: citymap[city].kilo
-                        });
-                    }
-                });
-
-
-                self_item.heatmap = new google.maps.visualization.HeatmapLayer({
-                    data: heatMapData
-                });
-
-                //d3.max(heatMapData).weight
-                //
-                self_item.heatmap.setMap(map);
-                self_item.heatmap.setOptions({
-                    radius: 15,
-                    maxIntensity: d3.max(heatMapData).weight,
-                    gradient: [
-                        'rgba(0, 255, 255, 0)',"#00FFFF",
-                        "#00EFFF",
-                        "#00DFFF",
-                        "#00D0FF",
-                        "#00C0FF",
-                        "#00B0FF",
-                        "#00A1FF",
-                        "#0091FF",
-                        "#0082FF",
-                        "#0072FF",
-                        "#0062FF",
-                        "#0053FF",
-                        "#0043FF",
-                        "#0034FF",
-                        "#0024FF",
-                        "#0014FF",
-                        "#0005FF",
-                        "#0A00FF",
-                        "#1A00FF",
-                        "#2900FF",
-                        "#3900FF",
-                        "#4800FF",
-                        "#5800FF",
-                        "#6800FF",
-                        "#7700FF",
-                        "#8700FF",
-                        "#9600FF",
-                        "#A600FF",
-                        "#B600FF",
-                        "#C500FF",
-                        "#D500FF",
-                        "#E400FF",
-                        "#F400FF",
-                        "#FF00F9",
-                        "#FF00EA",
-                        "#FF00DA",
-                        "#FF00CA",
-                        "#FF00BB",
-                        "#FF00AB",
-                        "#FF009C",
-                        "#FF008C",
-                        "#FF007C",
-                        "#FF006D",
-                        "#FF005D",
-                        "#FF004E",
-                        "#FF003E",
-                        "#FF002E",
-                        "#FF001F",
-                        "#FF000F",
-                        "#FF0000"]
-                });
-
-                self_item.markers.push(self_item.heatmap);
-            });
-        }
-        else if (type === "avdistance") {
-            //from Totals.csv
-            //Retrieve the necessary data
-            d3.csv("tubedata/RODS_2016/Exit/Distance travelled/Totals.csv", function (csvData) {
-                let menu = document.getElementById("categoryMenu");
-                let stat = menu.options[menu.selectedIndex].value;
-
-                stat = (stat.split(' ')).splice(0, 3).join('_');
-
-                //change necessary columns
-                csvData.forEach(function (da, i) {
-                    da["" + stat + ""] = +da["" + stat + ""];
-                });
-
-                self_item.stations.forEach(function (d, i) {
-                    let val = csvData.filter(function (n) {
-                        return n.Station.trim() === d.title.trim();
-                    });
-
-                    if (val[0]) {
-                        //Construct object with all the information for heatmap based on what the user selects
-                        citymap.push({
-                            title: d.title,
-                            center: {lat: d.position.lat, lng: d.position.lon},
-                            dist: val[0]["" + stat + ""]
-                        });
-                    }
-
-                    for (let city in citymap) {
-                        heatMapData.push({
-                            location: new google.maps.LatLng(citymap[city].center.lat, citymap[city].center.lng),
-                            weight: citymap[city].dist
-                        });
-                    }
-                });
-
-                self_item.heatmap = new google.maps.visualization.HeatmapLayer({
-                    data: heatMapData
-                });
-
-                self_item.heatmap.setMap(map);
-                self_item.heatmap.setOptions({
-                    radius: 15,
-                    maxIntensity: d3.max(heatMapData).weight * 50,
-                    gradient: [ 'rgba(0, 255, 255, 0)',
-                        "#00FFFF",
-                        "#00EFFF",
-                        "#00DFFF",
-                        "#00D0FF",
-                        "#00C0FF",
-                        "#00B0FF",
-                        "#00A1FF",
-                        "#0091FF",
-                        "#0082FF",
-                        "#0072FF",
-                        "#0062FF",
-                        "#0053FF",
-                        "#0043FF",
-                        "#0034FF",
-                        "#0024FF",
-                        "#0014FF",
-                        "#0005FF",
-                        "#0A00FF",
-                        "#1A00FF",
-                        "#2900FF",
-                        "#3900FF",
-                        "#4800FF",
-                        "#5800FF",
-                        "#6800FF",
-                        "#7700FF",
-                        "#8700FF",
-                        "#9600FF",
-                        "#A600FF",
-                        "#B600FF",
-                        "#C500FF",
-                        "#D500FF",
-                        "#E400FF",
-                        "#F400FF",
-                        "#FF00F9",
-                        "#FF00EA",
-                        "#FF00DA",
-                        "#FF00CA",
-                        "#FF00BB",
-                        "#FF00AB",
-                        "#FF009C",
-                        "#FF008C",
-                        "#FF007C",
-                        "#FF006D",
-                        "#FF005D",
-                        "#FF004E",
-                        "#FF003E",
-                        "#FF002E",
-                        "#FF001F",
-                        "#FF000F",
-                        "#FF0000"]
-                });
-
-                self_item.markers.push(self_item.heatmap);
-            });
-        }
-        else if (type === "access") {
-            //from Access.csv
-            //Retrieve the necessary data
-            d3.csv("tubedata/RODS_2016/Entry/Access mode/Access.csv", function (error, csvData) {
-                let menu1 = document.getElementById("categoryMenu");
-                let cat = menu1.options[menu1.selectedIndex].value;
-
-                cat = cat.split(' ').join('_');
-
-                let menu2 = document.getElementById("dayMenu");
-                let day = menu2.options[menu2.selectedIndex].value;
-
-                //change necessary columns
-                csvData.forEach(function (da) {
-                  da[cat] = +da[cat];
-                });
-
-                self_item.stations.forEach(function (d, i) {
-                    let val = csvData.filter(function (n) {
-                        return n.Station.trim() === d.title.trim() && n.Time_period.trim() === day;
-                    });
-
-                    if (val[0]) {
-                        //Construct object with all the information for heatmap based on what the user selects
-                        citymap.push({
-                            title: d.title,
-                            center: {lat: d.position.lat, lng: d.position.lon},
-                            num: val[0]["" + cat + ""]
-                        });
-                    }
-
-                    for (let city in citymap) {
-                        heatMapData.push({
-                            location: new google.maps.LatLng(citymap[city].center.lat, citymap[city].center.lng),
-                            weight: citymap[city].num
-                        });
-                    }
-                });
-
-                self_item.heatmap = new google.maps.visualization.HeatmapLayer({
-                    data: heatMapData
-                });
-
-                self_item.heatmap.setMap(map);
-                self_item.heatmap.setOptions({
-                    radius: 15,
-                    maxIntensity: d3.max(heatMapData).weight*150,
-                    gradient: [ 'rgba(0, 255, 255, 0)',
-                        "#00FFFF",
-                        "#00EFFF",
-                        "#00DFFF",
-                        "#00D0FF",
-                        "#00C0FF",
-                        "#00B0FF",
-                        "#00A1FF",
-                        "#0091FF",
-                        "#0082FF",
-                        "#0072FF",
-                        "#0062FF",
-                        "#0053FF",
-                        "#0043FF",
-                        "#0034FF",
-                        "#0024FF",
-                        "#0014FF",
-                        "#0005FF",
-                        "#0A00FF",
-                        "#1A00FF",
-                        "#2900FF",
-                        "#3900FF",
-                        "#4800FF",
-                        "#5800FF",
-                        "#6800FF",
-                        "#7700FF",
-                        "#8700FF",
-                        "#9600FF",
-                        "#A600FF",
-                        "#B600FF",
-                        "#C500FF",
-                        "#D500FF",
-                        "#E400FF",
-                        "#F400FF",
-                        "#FF00F9",
-                        "#FF00EA",
-                        "#FF00DA",
-                        "#FF00CA",
-                        "#FF00BB",
-                        "#FF00AB",
-                        "#FF009C",
-                        "#FF008C",
-                        "#FF007C",
-                        "#FF006D",
-                        "#FF005D",
-                        "#FF004E",
-                        "#FF003E",
-                        "#FF002E",
-                        "#FF001F",
-                        "#FF000F",
-                        "#FF0000"]
-                });
-
-                self_item.markers.push(self_item.heatmap);
-            });
-        }
-        else if (type === "purpose") {
-          //from journey purpose
-          //Retrieve the necessary data
-          d3.csv("tubedata/RODS_2016/Entry/Journey purpose/journey purpose.csv", function (csvData) {
-              let menu1 = document.getElementById("categoryMenu");
-              let cat   = menu1.options[menu1.selectedIndex].value;
-
-              let menu2 = document.getElementById("placeMenu");
-              let place = menu2.options[menu2.selectedIndex].value;
-
-              let menu3 = document.getElementById("dayMenu");
-              let day   = menu3.options[menu3.selectedIndex].value;
-
-              if (place === "Destination Purpose")
-                cat = "D" + cat;
-
-              //change necessary columns
-              csvData.forEach(function (da) {
-                if (cat === "Work" || cat === "Home") {
-                  da[cat] = +da[cat + '1'] + da[cat + '2'];
-                }
-                else {
-                  da[cat] = +da[cat];
-                }
-              });
-
-              self_item.stations.forEach(function (d, i) {
-                  let val = csvData.filter(function (n) {
-                      return n.Station.trim() === d.title.trim() && n["Time period"].trim() === day;
-                  });
-
-                  if (val[0]) {
-                      //Construct object with all the information for heatmap based on what the user selects
-                      citymap.push({
-                          title: d.title,
-                          center: {lat: d.position.lat, lng: d.position.lon},
-                          num: val[0]["" + cat + ""]
-                      });
-                  }
-
-                  for (let city in citymap) {
-                      heatMapData.push({
-                          location: new google.maps.LatLng(citymap[city].center.lat, citymap[city].center.lng),
-                          weight: parseInt(citymap[city].num)
-                      });
-                  }
-              });
-
-              self_item.heatmap = new google.maps.visualization.HeatmapLayer({
-                  data: heatMapData
-              });
-
-              self_item.heatmap.setMap(map);
-              self_item.heatmap.setOptions({
-                  radius: 15,
-                  maxIntensity: d3.max(heatMapData).weight*200,
-                  gradient: [ 'rgba(0, 255, 255, 0)',
-                      "#00FFFF",
-                      "#00EFFF",
-                      "#00DFFF",
-                      "#00D0FF",
-                      "#00C0FF",
-                      "#00B0FF",
-                      "#00A1FF",
-                      "#0091FF",
-                      "#0082FF",
-                      "#0072FF",
-                      "#0062FF",
-                      "#0053FF",
-                      "#0043FF",
-                      "#0034FF",
-                      "#0024FF",
-                      "#0014FF",
-                      "#0005FF",
-                      "#0A00FF",
-                      "#1A00FF",
-                      "#2900FF",
-                      "#3900FF",
-                      "#4800FF",
-                      "#5800FF",
-                      "#6800FF",
-                      "#7700FF",
-                      "#8700FF",
-                      "#9600FF",
-                      "#A600FF",
-                      "#B600FF",
-                      "#C500FF",
-                      "#D500FF",
-                      "#E400FF",
-                      "#F400FF",
-                      "#FF00F9",
-                      "#FF00EA",
-                      "#FF00DA",
-                      "#FF00CA",
-                      "#FF00BB",
-                      "#FF00AB",
-                      "#FF009C",
-                      "#FF008C",
-                      "#FF007C",
-                      "#FF006D",
-                      "#FF005D",
-                      "#FF004E",
-                      "#FF003E",
-                      "#FF002E",
-                      "#FF001F",
-                      "#FF000F",
-                      "#FF0000"]
-              });
-
-              self_item.markers.push(self_item.heatmap);
-          });
-        }
-    }
-
-    changeGradient(gradient) {
-        if (this.heatmap) {
-            this.heatmap.set('gradient', this.heatmap.get('gradient') ? null : gradient);
-        }
-    }
-
-    changeRadius(radius) {
-        let currRadius = this.heatmap.get('radius');
-        let newRadius = currRadius + radius;
-
-        this.heatmap.set('radius', currRadius >= 0 ? newRadius : 0);
-
-        return newRadius;
-    }
-
-
-    //Changes the opacity of the circles and the heatmap
-    changeOpacity(opacity) {
-        let currOpacity = this.heatmap.get('opacity');
-        let newOpacity = currOpacity + opacity;
-
-        newOpacity = newOpacity > 1 ? 1 : newOpacity;
-
-        this.heatmap.set('opacity', newOpacity >= 0 ? newOpacity : 0);
-        return newOpacity;
+    async setHeatmap(map, type) {
+        const id = this.nextRequest();
+        const values = await this.stationValues(type);
+        if (!values || !this.isCurrent(id)) return;
+        this.clearMarkers();
+        this.drawHeatmap(values.map(d => ({...d, weight: d.value})));
     }
 }
