@@ -589,14 +589,15 @@
             d3.selectAll('.selectLeft').remove();
             const dropleft = d3.select('.dropleft')
                 .append('select')
-                .attr('class', 'selectLeft')
+                .attr('class', 'selectLeft select')
+                .attr('id', 'compare-select')
                 .on('change', ()=> barDiffFactory())
 
             dropleft.append('option')
                 .attr('value', '')
                 .property('disabled', true)
                 .property('selected', true)
-                .text('-- compare with --');
+                .text('Choose a station');
 
             dropleft.selectAll('option.stationOption')
                 .data(categories)

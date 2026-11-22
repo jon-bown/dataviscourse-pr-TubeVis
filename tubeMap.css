@@ -339,10 +339,10 @@ text.highlighted {
 }
 
 .barChartDropDown {
-  width: 200px;
   display: none;
   flex-direction: column;
-  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 
@@ -354,9 +354,7 @@ text.highlighted {
   display: flex;
 }
 
-.dropleft, .dropRight {
-  padding: 5px;
-}
+
 
 
 
@@ -426,14 +424,39 @@ body {
   margin-bottom: 10px;
 }
 
-#floating-panel1 button {
-  font: inherit;
-  margin-left: 4px;
+/* Data type, play button and the playback bar */
+.tube-toolbar {
+  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
-#floating-panel1 button:disabled {
-  cursor: progress;
-  opacity: 0.6;
+.animation-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+}
+
+.animation-controls[hidden],
+#tube-button[hidden] {
+  display: none;
+}
+
+.animation-controls .slider {
+  align-self: center;
+}
+
+/* Straightened-line view: back, yearly counts and compare */
+.line-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+}
+
+.compare-field .select {
+  min-width: 200px;
 }
 
 #tube-map {
@@ -455,11 +478,6 @@ body {
 }
 
 
-#back-to-map {
-  align-self: flex-start;
-  margin-bottom: 8px;
-  cursor: pointer;
-}
 
 /* ---- Straightened-line view: page scrolls; station charts sit between
    the menus and the line, which moves down to make room ---- */
@@ -670,12 +688,6 @@ body.line-mode {
 }
 
 /* ---- Tube map page type (shared font, title and tabs live in site.css) ---- */
-#floating-panel1 h4.lineMode {
-  font-size: 16px;
-  color: #0019A8;
-  cursor: pointer;
-}
-
 .legendTitle {
   font-size: 18px;
   font-weight: normal;

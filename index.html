@@ -44,29 +44,50 @@
         <a href="map.html">Station Map</a>
         <a href="video.html">Demo Video</a>
     </nav>
-    <p class="site-subtitle">Click Animation Button to Start; Scroll to Zoom; Click and Drag Map; Click Line for more data</p>
+    <p class="site-subtitle">Press play to watch a day of journeys. Scroll to zoom, drag to pan, and click a line or station name for more.</p>
 
-    <label for="entry-exit">Select Data Type:</label>
-    <select id="entry-exit">
-        <option value="null"> -- select an option --</option>
-        <option value="both">Both Entry &amp; Exit</option>
-        <option value="entry">Entry</option>
-        <option value="exit">Exit</option>
-    </select>
+    <div class="toolbar tube-toolbar">
+        <div class="field">
+            <span class="field-label" id="data-type-label">Show journeys</span>
+            <fieldset class="segmented" id="entry-exit" aria-labelledby="data-type-label">
+                <input type="radio" name="entry-exit" id="type-both" value="both" checked>
+                <label for="type-both">Entries &amp; exits</label>
+                <input type="radio" name="entry-exit" id="type-entry" value="entry">
+                <label for="type-entry">Entries</label>
+                <input type="radio" name="entry-exit" id="type-exit" value="exit">
+                <label for="type-exit">Exits</label>
+            </fieldset>
+        </div>
 
-    <button id="tube-button" type="button">A Day on the Tube Animation</button>
-    <span id="animation-controls" hidden>
-        <button id="stopButton" class="button" type="button">Stop Animation</button>
-        <button id="pause" class="button" type="button">Pause Audio</button>
-        <button id="volup" class="button" type="button">Vol +</button>
-        <button id="voldown" class="button" type="button">Vol -</button>
-    </span>
+        <button id="tube-button" class="btn btn-primary btn-large" type="button">
+            <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9.5-5.5z"/></svg>
+            Play a day on the Tube
+        </button>
+
+        <div id="animation-controls" class="animation-controls" hidden>
+            <button id="stopButton" class="btn btn-danger" type="button">
+                <svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="2" width="10" height="10" rx="1"/></svg>
+                Stop
+            </button>
+            <button id="pause" class="btn" type="button" aria-pressed="false">Pause sound</button>
+            <label class="slider">
+                <span class="field-label">Volume</span>
+                <input id="volume" type="range" min="0" max="1" step="0.05" value="1" aria-label="Volume">
+            </label>
+        </div>
+    </div>
 
     <div class="barChartDropDown">
-        <button id="back-to-map" class="button" type="button">&larr; Back to full map</button>
-        <h4 class="lineMode">Select a Station on the Line, then a Station to Compare. Click here for yearly counts.</h4>
+        <div class="line-actions">
+            <button id="back-to-map" class="btn" type="button">&larr; Full map</button>
+            <button class="lineMode btn" type="button">Yearly counts</button>
+            <div class="field compare-field">
+                <label class="field-label" for="compare-select">Compare with</label>
+                <div class="dropleft"></div>
+            </div>
+        </div>
+        <p class="hint">Pick a station on the line (its dot or its name) to see who travels there, then choose another to compare.</p>
         <div class="selectItems">
-            <div class="dropleft"></div>
             <div class="dropRight"></div>
         </div>
     </div>
@@ -246,6 +267,13 @@
     const startButton = document.getElementById('tube-button');
     const controls = document.getElementById('animation-controls');
     const pauseButton = document.getElementById('pause');
+    const typePicker = document.getElementById('entry-exit');
+    const volume = document.getElementById('volume');
+
+    const setSoundButton = playing => {
+        pauseButton.textContent = playing ? "Pause sound" : "Play sound";
+        pauseButton.setAttribute('aria-pressed', String(!playing));
+    };
 
     // The clock runs from 05:00 through to 04:59 the next morning, one tick per minute
     const buildTimeTable = () => {
@@ -266,21 +294,20 @@
     const onAnimationFinished = () => {
         stopAudio();
         controls.hidden = true;
-        startButton.disabled = false;
+        startButton.hidden = false;
+        typePicker.disabled = false;
+        startButton.focus();
     };
 
     let animationData = null;  // cached [stations, AEI summary]
 
     async function startTimeAnimation() {
-        const type = document.getElementById("entry-exit").value;
-        if (type === "null") {
-            alert("Please choose data type");
-            return;
-        }
+        const type = document.querySelector('input[name="entry-exit"]:checked').value;
 
-        startButton.disabled = true;
+        startButton.hidden = true;
+        typePicker.disabled = true;
         controls.hidden = false;
-        pauseButton.textContent = "Pause Audio";
+        setSoundButton(true);
         map.setTimeStop();
 
         sound.currentTime = 0;
@@ -315,18 +342,14 @@
     pauseButton.addEventListener("click", () => {
         if (sound.paused) {
             sound.play().catch(() => {});
-            pauseButton.textContent = "Pause Audio";
+            setSoundButton(true);
         } else {
             sound.pause();
-            pauseButton.textContent = "Play Audio";
+            setSoundButton(false);
         }
     });
 
-    const changeVolume = delta => {
-        sound.volume = Math.min(1, Math.max(0, sound.volume + delta));
-    };
-    document.getElementById("volup").addEventListener("click", () => changeVolume(0.1));
-    document.getElementById("voldown").addEventListener("click", () => changeVolume(-0.1));
+    volume.addEventListener("input", () => { sound.volume = Number(volume.value); });
 </script>
 
 </body>

@@ -106,7 +106,28 @@ class OverlayMap {
     applyOpacity() {
         if (this.heatmap && this.heatmap._canvas) this.heatmap._canvas.style.opacity = this.opacity;
     }
+
+    // Absolute setters for the sliders and toggles on map.html
+    setRadius(value) {
+        return this.changeRadius(value - this.radius);
+    }
+
+    setOpacity(value) {
+        return this.changeOpacity(value - this.opacity);
+    }
+
+    setGradient(useCustom) {
+        if (useCustom !== this.useCustomGradient) this.changeGradient();
+    }
 }
+
+// Value of a control: the checked radio in a group, or a select's value
+const fieldValue = name => {
+    const checked = document.querySelector(`input[name="${CSS.escape(name)}"]:checked`);
+    if (checked) return checked.value;
+    const el = document.getElementById(name);
+    return el && 'value' in el ? el.value : '';
+};
 
 /*
  * Yearly entry / exit counts per station
@@ -125,9 +146,9 @@ class MAP extends OverlayMap {
 
     /** Current selection from the menus, or null if incomplete */
     selection() {
-        const type = document.getElementById("data-type").value;   // "ent" | "ext"
-        const week = document.getElementById("data-week").value;   // "Week" | "Sat" | "Sun"
-        const year = document.getElementById("data-year").value;
+        const type = fieldValue("data-type");   // "ent" | "ext"
+        const week = fieldValue("data-week");   // "Week" | "Sat" | "Sun"
+        const year = fieldValue("data-year");
         if (!type || !week || !year) return null;
         const day = {Week: 'week', Sat: 'saturday', Sun: 'sunday'}[week];
         return {year, field: `${type === 'ent' ? 'entry' : 'exit'}_${day}`};

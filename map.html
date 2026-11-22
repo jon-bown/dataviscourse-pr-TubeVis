@@ -22,20 +22,6 @@
             color: var(--tube-blue);
         }
 
-        .note {
-            margin-top: 4px;
-            font-size: 14px;
-            color: var(--text-secondary);
-        }
-
-        .map-info {
-            line-height: 1.6;
-        }
-
-        .map-info b {
-            color: var(--text-secondary);
-        }
-
         /* Leaflet sets its own font on tooltips and attribution */
         .leaflet-container {
             font-family: var(--site-font);
@@ -48,28 +34,36 @@
             border-top: 1px solid #e4e2dc;
         }
 
-        .map-row {
-            display: flex;
-            gap: 2%;
-            margin: 0 4% 20px 4%;
+        .panel {
+            margin: 0 30px;
+        }
+
+        .panel .toolbar {
+            margin-bottom: 14px;
+        }
+
+        .survey-menus {
+            display: contents;
+        }
+
+        .heat-only-hint {
+            align-self: center;
+            display: none;
+        }
+
+        fieldset.control-group:disabled .heat-only-hint {
+            display: block;
+        }
+
+        .survey-hint {
+            margin: -4px 0 12px;
         }
 
         .map-canvas {
-            flex: 0 0 75%;
-            height: 500px;
-        }
-
-        .map-info {
-            flex: 1;
-            padding-top: 1em;
-        }
-
-        .panel {
-            margin-left: 30px;
-        }
-
-        .panel select, .panel button {
-            margin: 2px 4px 2px 0;
+            height: 520px;
+            margin-bottom: 20px;
+            border: 1px solid #e4e2dc;
+            border-radius: 12px;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
@@ -95,117 +89,146 @@
     <p class="site-subtitle">Pick a year, entries or exits and a day to map each station's traffic; the second map shows the 2016 survey</p>
 </header>
 
-<div id="floating-panel1" class="panel">
-    <h2 class="section-title">Yearly Entry and Exit Tube Data</h2>
-    <label for="data-year">Select Year</label>
-    <select id="data-year" onchange="callback(); changeDisplayBox1()">
-        <option disabled selected value> -- select an option --</option>
-        <option value="2007">2007</option>
-        <option value="2008">2008</option>
-        <option value="2009">2009</option>
-        <option value="2010">2010</option>
-        <option value="2011">2011</option>
-        <option value="2012">2012</option>
-        <option value="2013">2013</option>
-        <option value="2014">2014</option>
-        <option value="2015">2015</option>
-        <option value="2016">2016</option>
-    </select>
-    <label for="data-type">Select Data Type</label>
-    <select id="data-type" onchange="callback(); changeDisplayBox1()">
-        <option disabled selected value> -- select an option --</option>
-        <option value="ent">Entry</option>
-        <option value="ext">Exit</option>
-    </select>
-    <label for="data-week">Select Week/Weekend</label>
-    <select id="data-week" onchange="callback(); changeDisplayBox1()">
-        <option disabled selected value> -- select an option --</option>
-        <option value="Week">Weekdays</option>
-        <option value="Sat">Saturday</option>
-        <option value="Sun">Sunday</option>
-    </select>
-    <select id="vis-type" onchange="changeVis(); changeDisplayBox1();" aria-label="Map type">
-        <option disabled selected value>-- select an option --</option>
-        <option value="heat">Heatmap</option>
-        <option value="circle">Bubbles</option>
-    </select>
-    <button type="button" onclick="toggleData()">Show/Hide</button>
-    <button type="button" onclick="changeGradient()">Change gradient</button>
-    <button type="button" onclick="addRadius()">Add Radius</button>
-    <button type="button" onclick="reduceRadius()">Reduce Radius</button>
-    <button type="button" onclick="addOpacity()">Add Opacity</button>
-    <button type="button" onclick="reduceOpacity()">Reduce Opacity</button>
-    <div class="note">Note: Gradient, radius and opacity only work with the heatmap.</div>
-</div>
-
-<div class="map-row">
-    <div id="map_canvas" class="map-canvas"></div>
-    <div class="map-info">
-        <div id="display-vis-type"><b>Current Map Type:</b></div>
-        <div id="display-data-year"><b>Selected Year:</b></div>
-        <div id="display-data-type"><b>Selected Data Type:</b></div>
-        <div id="display-data-week"><b>Selected Weekday(s):</b></div>
-        <br>
-        <div id="display-radius"><b>Radius: </b></div>
-        <div id="display-opacity"><b>Opacity: </b></div>
+<section id="floating-panel1" class="panel" aria-labelledby="counts-title">
+    <h2 class="section-title" id="counts-title">Yearly Entry and Exit Tube Data</h2>
+    <div class="toolbar" id="counts-controls">
+        <div class="field">
+            <label class="field-label" for="data-year">Year</label>
+            <select class="select" id="data-year">
+                <option value="2007">2007</option>
+                <option value="2008">2008</option>
+                <option value="2009">2009</option>
+                <option value="2010">2010</option>
+                <option value="2011">2011</option>
+                <option value="2012">2012</option>
+                <option value="2013">2013</option>
+                <option value="2014">2014</option>
+                <option value="2015">2015</option>
+                <option value="2016" selected>2016</option>
+            </select>
+        </div>
+        <div class="field">
+            <span class="field-label" id="data-type-label">Count</span>
+            <fieldset class="segmented" id="data-type" aria-labelledby="data-type-label">
+                <input type="radio" name="data-type" id="data-type-ent" value="ent" checked>
+                <label for="data-type-ent">Entries</label>
+                <input type="radio" name="data-type" id="data-type-ext" value="ext">
+                <label for="data-type-ext">Exits</label>
+            </fieldset>
+        </div>
+        <div class="field">
+            <span class="field-label" id="data-week-label">Day</span>
+            <fieldset class="segmented" id="data-week" aria-labelledby="data-week-label">
+                <input type="radio" name="data-week" id="data-week-week" value="Week" checked>
+                <label for="data-week-week">Weekdays</label>
+                <input type="radio" name="data-week" id="data-week-sat" value="Sat">
+                <label for="data-week-sat">Saturday</label>
+                <input type="radio" name="data-week" id="data-week-sun" value="Sun">
+                <label for="data-week-sun">Sunday</label>
+            </fieldset>
+        </div>
+        <div class="field">
+            <span class="field-label" id="vis-type-label">Show as</span>
+            <fieldset class="segmented" id="vis-type" aria-labelledby="vis-type-label">
+                <input type="radio" name="vis-type" id="vis-type-heat" value="heat" checked>
+                <label for="vis-type-heat">Heatmap</label>
+                <input type="radio" name="vis-type" id="vis-type-circle" value="circle">
+                <label for="vis-type-circle">Bubbles</label>
+            </fieldset>
+        </div>
+        <div class="field">
+            <span class="field-label">Overlay</span>
+            <label class="switch"><input type="checkbox" id="show-1" checked> Visible</label>
+        </div>
+        <div class="toolbar-break"></div>
+        <fieldset class="control-group heat-only" id="heat-settings-1" aria-label="Heatmap settings">
+            <div class="field">
+                <label class="field-label" for="radius-1">Heat radius</label>
+                <span class="slider"><input type="range" id="radius-1" min="1" max="50" step="1" value="15"><output for="radius-1">15</output></span>
+            </div>
+            <div class="field">
+                <label class="field-label" for="opacity-1">Opacity</label>
+                <span class="slider"><input type="range" id="opacity-1" min="0" max="1" step="0.1" value="0.6"><output for="opacity-1">0.6</output></span>
+            </div>
+            <div class="field">
+                <span class="field-label" id="gradient-1-label">Colours</span>
+                <fieldset class="segmented" id="gradient-1" aria-labelledby="gradient-1-label">
+                    <input type="radio" name="gradient-1" id="gradient-1-custom" value="custom" checked>
+                    <label for="gradient-1-custom">Blue to red</label>
+                    <input type="radio" name="gradient-1" id="gradient-1-default" value="default">
+                    <label for="gradient-1-default">Green to red</label>
+                </fieldset>
+            </div>
+            <p class="hint heat-only-hint">Heatmap settings; not used for bubbles.</p>
+        </fieldset>
     </div>
-</div>
+    <div id="map_canvas" class="map-canvas"></div>
+</section>
 
 <hr class="section-rule">
 
-<div id="floating-panel2" class="panel">
-    <h2 class="section-title">2016 Tube Survey Data</h2>
-    <label for="survey-stat">Select Entry Data</label>
-    <select id="survey-stat" onchange="surveyCallback(); changeDisplayBox2()">
-        <option disabled selected value> -- select an option --</option>
-        <option value="purpose">Ride Purpose</option>
-        <option value="distancekm">Kms Travelled</option>
-        <option value="avdistance">Average Distance Travelled</option>
-        <option value="avtime">Average Time on Train</option>
-        <option value="access">Mode of Access</option>
-    </select>
-
-    <select id="vis-type2" onchange="changeVis2(); changeDisplayBox2()" aria-label="Survey map type">
-        <option disabled selected value> -- select an option --</option>
-        <option value="heat">Heatmap</option>
-        <option value="circle">Bubble</option>
-    </select>
-    <button type="button" onclick="toggleData2()">Show/Hide</button>
-    <button type="button" onclick="changeGradient2()">Change gradient</button>
-    <button type="button" onclick="addRadius2()">Add Radius</button>
-    <button type="button" onclick="reduceRadius2()">Reduce Radius</button>
-    <button type="button" onclick="addOpacity2()">Add Opacity</button>
-    <button type="button" onclick="reduceOpacity2()">Reduce Opacity</button>
-    <div class="note">Note: Gradient, radius and opacity only work with the heatmap.</div>
-    <div class="note">Note 2: Only compare bubbles in the same instance. They are not tuned to scale for different instances.</div>
-</div>
-
-<div class="map-row">
-    <div id="map_canvas2" class="map-canvas"></div>
-    <div class="map-info">
-        <div id="display-vis-type2"><b>Current Map Type: </b></div>
-        <div id="display-survey-stat"><b>Selected Survey: </b></div>
-        <div id="disp-category"></div>
-        <div id="disp-day"></div>
-        <div id="disp-place"></div>
-        <br>
-        <div id="display-radius-2"><b>Radius: </b></div>
-        <div id="display-opacity-2"><b>Opacity: </b></div>
+<section id="floating-panel2" class="panel" aria-labelledby="survey-title">
+    <h2 class="section-title" id="survey-title">2016 Tube Survey Data</h2>
+    <div class="toolbar" id="survey-controls">
+        <div class="field">
+            <label class="field-label" for="survey-stat">Survey</label>
+            <select class="select" id="survey-stat">
+                <option disabled selected value="">Choose a survey</option>
+                <option value="purpose">Ride Purpose</option>
+                <option value="distancekm">Kms Travelled</option>
+                <option value="avdistance">Average Distance Travelled</option>
+                <option value="avtime">Average Time on Train</option>
+                <option value="access">Mode of Access</option>
+            </select>
+        </div>
+        <div id="survey-menus" class="survey-menus"></div>
+        <div class="field">
+            <span class="field-label" id="vis-type2-label">Show as</span>
+            <fieldset class="segmented" id="vis-type2" aria-labelledby="vis-type2-label">
+                <input type="radio" name="vis-type2" id="vis-type2-heat" value="heat" checked>
+                <label for="vis-type2-heat">Heatmap</label>
+                <input type="radio" name="vis-type2" id="vis-type2-circle" value="circle">
+                <label for="vis-type2-circle">Bubbles</label>
+            </fieldset>
+        </div>
+        <div class="field">
+            <span class="field-label">Overlay</span>
+            <label class="switch"><input type="checkbox" id="show-2" checked> Visible</label>
+        </div>
+        <div class="toolbar-break"></div>
+        <fieldset class="control-group heat-only" id="heat-settings-2" aria-label="Heatmap settings">
+            <div class="field">
+                <label class="field-label" for="radius-2">Heat radius</label>
+                <span class="slider"><input type="range" id="radius-2" min="1" max="50" step="1" value="15"><output for="radius-2">15</output></span>
+            </div>
+            <div class="field">
+                <label class="field-label" for="opacity-2">Opacity</label>
+                <span class="slider"><input type="range" id="opacity-2" min="0" max="1" step="0.1" value="0.6"><output for="opacity-2">0.6</output></span>
+            </div>
+            <div class="field">
+                <span class="field-label" id="gradient-2-label">Colours</span>
+                <fieldset class="segmented" id="gradient-2" aria-labelledby="gradient-2-label">
+                    <input type="radio" name="gradient-2" id="gradient-2-custom" value="custom" checked>
+                    <label for="gradient-2-custom">Blue to red</label>
+                    <input type="radio" name="gradient-2" id="gradient-2-default" value="default">
+                    <label for="gradient-2-default">Green to red</label>
+                </fieldset>
+            </div>
+            <p class="hint heat-only-hint">Heatmap settings; not used for bubbles.</p>
+        </fieldset>
     </div>
-</div>
+    <p class="hint survey-hint">Bubble sizes are scaled within each survey choice, so compare bubbles only within the same choice.</p>
+    <div id="map_canvas2" class="map-canvas"></div>
+</section>
 
 <script>
     //The globe objects manage the overlays on each separate map
     let globeEntry, globeSurvey;
 
-    //keeps track if the overlays are visible
-    let map1Vis = true;
-    let map2Vis = true;
-
-    const BAD_TEXT = "-- select an option --";
+    const PLACEHOLDER = "Choose one";
     const LONDON = [51.501904, -0.115871];
 
-    // Base map with rail lines drawn (stands in for the old Google transit layer)
+    // OpenStreetMap base map (stands in for the old Google transit layer)
     const createMap = id => {
         const map = L.map(id).setView(LONDON, 11);
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -215,213 +238,116 @@
         return map;
     };
 
-    //Initialize the maps
+    //Initialize the maps; the counts map draws straight away from the defaults
     d3.json("stations.json").then(data => {
         globeEntry = new MAP(createMap('map_canvas'), data.stations);
         globeSurvey = new SurveyMap(createMap('map_canvas2'), data.stations);
-        showHeatmapSettings();
+        drawCounts();
+        drawSurvey();
     }).catch(error => {
         console.error(error);
         alert('Could not load stations.json. If you opened map.html directly from disk, ' +
             'serve the folder over HTTP instead (see README).');
     });
 
-    const setLabel = (id, label, value) => {
-        const el = document.getElementById(id);
-        el.replaceChildren();
-        const b = document.createElement('b');
-        b.textContent = label;
-        el.append(b, value === undefined ? '' : String(value));
+    // Redraws an overlay from its menus. Heatmap settings grey out for bubbles,
+    // and nothing is drawn while the "Visible" switch is off.
+    const redraw = (globe, n, mapTypeName, draw) => {
+        if (!globe) return;
+        const mapType = fieldValue(mapTypeName);
+        document.getElementById(`heat-settings-${n}`).disabled = mapType !== 'heat';
+        globe.nextRequest();
+        globe.clearMarkers();
+        if (document.getElementById(`show-${n}`).checked) draw(mapType);
     };
 
-    const selectedText = id => {
-        const el = document.getElementById(id);
-        if (!el || el.selectedIndex < 0) return "";
-        const text = el.selectedOptions[0].text.trim();
-        return text === BAD_TEXT ? "" : text;
+    function drawCounts() {
+        redraw(globeEntry, 1, 'vis-type', mapType => {
+            if (mapType === 'heat') globeEntry.setHeatmap();
+            else globeEntry.setCircles();
+        });
+    }
+
+    function drawSurvey() {
+        redraw(globeSurvey, 2, 'vis-type2', mapType => {
+            const stat = fieldValue('survey-stat');
+            if (!stat) return;
+            if (mapType === 'heat') globeSurvey.setHeatmap(null, stat);
+            else globeSurvey.setCircles(null, stat);
+        });
+    }
+
+    // Each survey needs its own follow-up menus (category, time of day, trip end)
+    const SECTIONS = ["Early", "AM peak", "Midday", "PM Peak", "Evening", "Late", "Total day"];
+    const SURVEY_MENUS = {
+        purpose: [
+            ['categoryMenu', 'Purpose', [PLACEHOLDER, 'Work', 'Home', 'Shop', 'Education', 'Tourist', 'Hotel', 'Other', 'Unknown/Not Given']],
+            ['dayMenu', 'Time of day', SECTIONS],
+            ['placeMenu', 'Trip end', ['Origin Purpose', 'Destination Purpose']],
+        ],
+        distancekm: [
+            ['categoryMenu', 'Distance', [PLACEHOLDER, "<1 km"].concat(d3.range(2, 31).map(String), ["30+ kms"])],
+        ],
+        avdistance: [
+            ['categoryMenu', 'Measure', [PLACEHOLDER, "Total passenger kilometres", "Average journey length (kms)"]],
+        ],
+        avtime: [
+            ['categoryMenu', 'Journey time', [PLACEHOLDER, "Average", "< 15 mins", "15 - 30", "30 - 45", "45 - 60", "60 - 90", "over 90"]],
+            ['dayMenu', 'Time of day', SECTIONS],
+        ],
+        access: [
+            ['categoryMenu', 'Mode', [PLACEHOLDER].concat(Object.keys(ACCESS_COLUMNS))],
+            ['dayMenu', 'Time of day', SECTIONS],
+        ],
     };
 
-    function showHeatmapSettings() {
-        setLabel("display-radius", "Radius: ", globeEntry.radius);
-        setLabel("display-opacity", "Opacity: ", globeEntry.opacity);
-        setLabel("display-radius-2", "Radius: ", globeSurvey.radius);
-        setLabel("display-opacity-2", "Opacity: ", globeSurvey.opacity);
-    }
-
-    //Callback on the first map options
-    function callback() {
-        changeVis();
-    }
-
-    //Callback on the survey map options
-    //Dynamically adds and removes menus based on what is selected
-    function surveyCallback() {
-        globeSurvey.clearMarkers();
-        d3.selectAll('.tempSelect').remove();
-        const type = document.getElementById("survey-stat").value;
-
-        const sections = [BAD_TEXT, "Early", "AM peak", "Midday", "PM Peak", "Evening", "Late", "Total day"];
-        const menus = {
-            purpose: [
-                ['categoryMenu', [BAD_TEXT, 'Work', 'Home', 'Shop', 'Education', 'Tourist', 'Hotel', 'Other', 'Unknown/Not Given']],
-                ['dayMenu', sections],
-                ['placeMenu', ['Origin Purpose', 'Destination Purpose']],
-            ],
-            distancekm: [
-                ['categoryMenu', [BAD_TEXT, "<1 km"].concat(d3.range(2, 31).map(String), ["30+ kms"])],
-            ],
-            avdistance: [
-                ['categoryMenu', [BAD_TEXT, "Total passenger kilometres", "Average journey length (kms)"]],
-            ],
-            avtime: [
-                ['categoryMenu', [BAD_TEXT, "Average", "< 15 mins", "15 - 30", "30 - 45", "45 - 60", "60 - 90", "over 90"]],
-                ['dayMenu', sections],
-            ],
-            access: [
-                ['categoryMenu', [BAD_TEXT].concat(Object.keys(ACCESS_COLUMNS))],
-                ['dayMenu', sections],
-            ],
-        }[type] || [];
-
-        // Insert the menus before the "Map type" select, in order
-        const visSelect = document.getElementById('vis-type2');
-        menus.forEach(([id, options]) => {
-            const select = d3.select(document.createElement('select'))
-                .attr('class', 'tempSelect')
-                .attr('id', id)
-                .on('change', () => {
-                    changeDisplayBox2();
-                    changeVis2();
-                });
-            select.selectAll('option')
+    function buildSurveyMenus() {
+        const container = d3.select('#survey-menus');
+        container.selectAll('*').remove();
+        (SURVEY_MENUS[fieldValue('survey-stat')] || []).forEach(([id, label, options]) => {
+            const field = container.append('div').attr('class', 'field');
+            field.append('label').attr('class', 'field-label').attr('for', id).text(label);
+            field.append('select').attr('class', 'select').attr('id', id)
+                .selectAll('option')
                 .data(options)
                 .join('option')
-                .attr('value', d => d === BAD_TEXT ? '' : d)
+                .attr('value', d => d === PLACEHOLDER ? '' : d)
                 .text(d => d)
-                .property('disabled', d => d === BAD_TEXT);
-            visSelect.before(select.node());
+                .property('disabled', d => d === PLACEHOLDER)
+                // Whole-day figures are the natural starting point
+                .property('selected', d => d === PLACEHOLDER || d === 'Total day');
         });
     }
 
-    //Clears the overlay on the entry/exit map
-    function toggleData() {
-        if (map1Vis) {
-            globeEntry.nextRequest();
-            globeEntry.clearMarkers();
-            map1Vis = false;
-        } else {
-            map1Vis = true;
-            changeVis();
-        }
-    }
+    // Menus and toggles redraw the map; the heatmap settings adjust it in place
+    document.getElementById('counts-controls').addEventListener('change', event => {
+        if (!event.target.closest('.heat-only')) drawCounts();
+    });
+    document.getElementById('survey-controls').addEventListener('change', event => {
+        if (event.target.closest('.heat-only')) return;
+        if (event.target.id === 'survey-stat') buildSurveyMenus();
+        drawSurvey();
+    });
 
-    //Changes the gradient on the entry/exit heatmap
-    function changeGradient() {
-        globeEntry.changeGradient();
-    }
-
-    //Adds to the radius of the heatmap
-    function addRadius() {
-        setLabel("display-radius", "Radius: ", globeEntry.changeRadius(1));
-    }
-
-    //Reduces the radius of the heatmap
-    function reduceRadius() {
-        setLabel("display-radius", "Radius: ", globeEntry.changeRadius(-1));
-    }
-
-    //Changes the opacity of the heatmap
-    function addOpacity() {
-        setLabel("display-opacity", "Opacity: ", globeEntry.changeOpacity(0.1));
-    }
-
-    function reduceOpacity() {
-        setLabel("display-opacity", "Opacity: ", globeEntry.changeOpacity(-0.1));
-    }
-
-    //Changes the vis type of the map according to what the user selects
-    function changeVis() {
-        if (!globeEntry) return;
-        globeEntry.clearMarkers();
-        map1Vis = true;
-        const type = document.getElementById("vis-type").value;
-        if (type === "heat") {
-            globeEntry.setHeatmap();
-        } else if (type === "circle") {
-            globeEntry.setCircles();
-        }
-    }
-
-    //Changes the display box to the right of the map based on options selected
-    function changeDisplayBox1() {
-        setLabel("display-vis-type", "Current Map Type: ", selectedText("vis-type"));
-        setLabel("display-data-year", "Selected Year: ", selectedText("data-year"));
-        setLabel("display-data-type", "Selected Data Type: ", selectedText("data-type"));
-        setLabel("display-data-week", "Selected Weekday(s): ", selectedText("data-week"));
-    }
-
-    //Clears the overlay on the survey map
-    function toggleData2() {
-        if (map2Vis) {
-            globeSurvey.nextRequest();
-            globeSurvey.clearMarkers();
-            map2Vis = false;
-        } else {
-            map2Vis = true;
-            changeVis2();
-        }
-    }
-
-    function changeGradient2() {
-        globeSurvey.changeGradient();
-    }
-
-    function addRadius2() {
-        setLabel("display-radius-2", "Radius: ", globeSurvey.changeRadius(1));
-    }
-
-    function reduceRadius2() {
-        setLabel("display-radius-2", "Radius: ", globeSurvey.changeRadius(-1));
-    }
-
-    function addOpacity2() {
-        setLabel("display-opacity-2", "Opacity: ", globeSurvey.changeOpacity(0.1));
-    }
-
-    function reduceOpacity2() {
-        setLabel("display-opacity-2", "Opacity: ", globeSurvey.changeOpacity(-0.1));
-    }
-
-    //Changes the vis type of the survey map according to what the user selects
-    function changeVis2() {
-        if (!globeSurvey) return;
-        globeSurvey.clearMarkers();
-        map2Vis = true;
-        const token = document.getElementById("survey-stat").value;
-        const type = document.getElementById("vis-type2").value;
-        if (type === "heat") {
-            globeSurvey.setHeatmap(null, token);
-        } else if (type === "circle") {
-            globeSurvey.setCircles(null, token);
-        }
-    }
-
-    //Changes the display box to the right of the survey map based on options selected
-    function changeDisplayBox2() {
-        setLabel("display-vis-type2", "Current Map Type: ", selectedText("vis-type2"));
-        setLabel("display-survey-stat", "Selected Survey: ", selectedText("survey-stat"));
-
-        const optional = [["categoryMenu", "disp-category", "Category: "], ["dayMenu", "disp-day", "Time: "], ["placeMenu", "disp-place", "Place: "]];
-        optional.forEach(([menuId, displayId, label]) => {
-            if (document.getElementById(menuId)) {
-                let text = selectedText(menuId);
-                if (menuId === "placeMenu") text = text.split(' ')[0];
-                setLabel(displayId, label, text);
-            } else {
-                document.getElementById(displayId).replaceChildren();
-            }
+    const wireHeatSettings = (n, getGlobe) => {
+        const radius = document.getElementById(`radius-${n}`);
+        const opacity = document.getElementById(`opacity-${n}`);
+        const show = (input, value) => { document.querySelector(`output[for="${input.id}"]`).value = value; };
+        radius.addEventListener('input', () => {
+            const globe = getGlobe();
+            show(radius, globe ? globe.setRadius(Number(radius.value)) : radius.value);
         });
-    }
+        opacity.addEventListener('input', () => {
+            const globe = getGlobe();
+            show(opacity, globe ? globe.setOpacity(Number(opacity.value)) : opacity.value);
+        });
+        document.getElementById(`gradient-${n}`).addEventListener('change', () => {
+            const globe = getGlobe();
+            if (globe) globe.setGradient(fieldValue(`gradient-${n}`) === 'custom');
+        });
+    };
+    wireHeatSettings(1, () => globeEntry);
+    wireHeatSettings(2, () => globeSurvey);
 </script>
 
 </body>
