@@ -46,6 +46,7 @@
     </nav>
     <p class="site-subtitle">Press play to watch a day of journeys. Scroll to zoom, drag to pan, and click a line or station name for more.</p>
 
+    <div class="control-row">
     <div class="toolbar tube-toolbar">
         <div class="field">
             <span class="field-label" id="data-type-label">Show journeys</span>
@@ -77,6 +78,13 @@
         </div>
     </div>
 
+    <!-- Departure-board clock and running journey count, shown while the animation plays -->
+    <div id="animation-status" class="animation-status" hidden aria-live="polite">
+        <div id="clock" class="clock"></div>
+        <div id="journey" class="journey"></div>
+    </div>
+    </div>
+
     <div class="barChartDropDown">
         <div class="line-actions">
             <button id="back-to-map" class="btn" type="button">&larr; Full map</button>
@@ -105,9 +113,6 @@
             </div>
         </div>
     </div>
-    <div id="clock" class="clock"></div>
-    <div style="clear: both;"></div>
-    <div id="journey" class="journey"></div>
     <div class="legendTitle">Legends</div>
     <div class="stationLegend"></div>
     <div style="clear: both;">&nbsp;</div>
@@ -269,6 +274,7 @@
     const pauseButton = document.getElementById('pause');
     const typePicker = document.getElementById('entry-exit');
     const volume = document.getElementById('volume');
+    const animationStatus = document.getElementById('animation-status');
 
     const setSoundButton = playing => {
         pauseButton.textContent = playing ? "Pause sound" : "Play sound";
@@ -294,6 +300,7 @@
     const onAnimationFinished = () => {
         stopAudio();
         controls.hidden = true;
+        animationStatus.hidden = true;
         startButton.hidden = false;
         typePicker.disabled = false;
         startButton.focus();
@@ -307,6 +314,7 @@
         startButton.hidden = true;
         typePicker.disabled = true;
         controls.hidden = false;
+        animationStatus.hidden = false;
         setSoundButton(true);
         map.setTimeStop();
 
