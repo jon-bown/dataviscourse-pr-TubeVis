@@ -1,302 +1,195 @@
 /*
-*Class that constructs objects on top of the google map and adjust according to selected data
-*
-*/
-class MAP {
+ * Leaflet overlays for map.html (requires D3 v7, Leaflet 1.9 and leaflet.heat).
+ *
+ * OverlayMap holds the shared heatmap / bubble logic. MAP draws the yearly
+ * entry & exit counts; SurveyMap (SurveyMap.js) draws the 2016 survey data.
+ */
+
+// Cyan -> blue -> magenta -> red, as used by the original Google heatmaps
+const HEAT_COLORS = ['rgba(0, 255, 255, 0)',
+    '#00FFFF', '#00DFFF', '#00C0FF', '#00A1FF', '#0082FF', '#0062FF', '#0043FF', '#0024FF', '#0005FF',
+    '#1A00FF', '#3900FF', '#5800FF', '#7700FF', '#9600FF', '#B600FF', '#D500FF', '#F400FF',
+    '#FF00EA', '#FF00CA', '#FF00AB', '#FF008C', '#FF006D', '#FF004E', '#FF002E', '#FF000F', '#FF0000'];
+
+// leaflet.heat wants {stop: color}; spread the colours evenly over 0..1
+const toGradient = colors => Object.fromEntries(colors.map((c, i) => [(i / (colors.length - 1)).toFixed(3), c]));
+
+const CUSTOM_GRADIENT = toGradient(HEAT_COLORS);
+// Green -> yellow -> red, similar to the Google Maps default heatmap gradient
+const DEFAULT_GRADIENT = {0.0: 'rgba(102, 255, 0, 0)', 0.2: 'rgb(102, 255, 0)', 0.5: 'rgb(255, 255, 0)', 1.0: 'rgb(255, 0, 0)'};
+
+const CIRCLE_STYLE = {color: '#FF0000', opacity: 0.8, weight: 1, fillColor: '#FF0000', fillOpacity: 0.25};
+
+class OverlayMap {
     /**
-     *Constructor for the map class
-     * @param map instance of google map object
-     *
+     * @param map Leaflet map instance
      */
     constructor(map) {
         this.map = map;
         //instance of heatmap
         this.heatmap = null;
-        //Keeps track of the current markers on the map
+        //Keeps track of the current layers on the map
         this.markers = [];
+        this.radius = 15;
+        this.opacity = 0.6;
+        this.useCustomGradient = true;
+        // Ignore results from requests that were superseded by a newer selection
+        this.requestId = 0;
+    }
+
+    nextRequest() {
+        return ++this.requestId;
+    }
+
+    isCurrent(id) {
+        return id === this.requestId;
     }
 
     /**
-     *
-     *@param map instance of google map object
-     *
+     * @param points array of {lat, lng, weight}
      */
-    setCircles(map) {
-        d3.selectAll(".circle").remove();
-
-        let keyValues = [];
-        let self_item = this;
-        let citymap = [];
-        let heatMapData = [];
-
-        d3.json("stations.json", function (error, data) {
-            if (error) {
-                console.log("something went wrong");
-            }
-
-            let keys = Object.keys(data.stations);
-            let vals = Object.keys(data.stations).map(function (key) {
-                //combine this object to use later.
-                keyValues.push({k: key, title: data.stations[key].title.trim(), position: data.stations[key].position});
-                return data.stations[key];
-            });
-
-            //Get the selected year, type, and week/weekend for the data
-            let e = document.getElementById("data-type");
-            let type = e.options[e.selectedIndex].value;
-
-            let f = document.getElementById("data-week");
-            let week = f.options[f.selectedIndex].value;
-
-            let g = document.getElementById("data-year");
-            let year = g.options[g.selectedIndex].value;
-
-
-            //Retrieve the necessary data
-            d3.csv("tubedata/counts/" + year + "_Entry_Exit.csv", function (error, csvData) {
-                csvData.forEach(function (da, i) {
-                    da.Entry_Weekday = +da.Entry_Weekday;
-                    da.Entry_Saturday = +da.Entry_Saturday;
-                    da.Entry_Sunday = +da.Entry_Sunday;
-                    da.Exit_Weekday = +da.Exit_Weekday;
-                    da.Exit_Saturday = +da.Exit_Saturday;
-                    da.Exit_Sunday = +da.Exit_Sunday;
-                });
-
-                keyValues.forEach(function (d, i) {
-                    let val = csvData.filter(function (n) {
-                        return n.Station.trim() === d.title.trim();
-                    });
-                    if (val.length === 0) {
-                        val.push({entry: 0});
-                    }
-
-                    //Construct object with all the information for the bubble chart
-                    citymap.push({
-                        title: d.title, center: {lat: d.position.lat, lng: d.position.lon},
-                        entWeek: val[0].Entry_Weekday,
-                        entSat: val[0].Entry_Saturday,
-                        entSun: val[0].Entry_Sunday,
-                        extWeek: val[0].Exit_Weekday,
-                        extSat: val[0].Exit_Saturday,
-                        extSun: val[0].Exit_Sunday
-                    });
-                });
-
-                for (let city in citymap) {
-                    // Add the circle for this city to the map.
-                    let cityCircle = new google.maps.Circle({
-                        class: "circle",
-                        strokeColor: '#FF0000',
-                        strokeOpacity: 0.8,
-                        strokeWeight: 1,
-                        fillColor: '#FF0000',
-                        fillOpacity: 0.25,
-                        map: map,
-                        center: citymap[city].center,
-                        //Here we set the radius according to some data gathered by the csv
-                        radius: citymap[city]["" + type + week + ""] / 50
-
-                        //Math.sqrt(citymap[city].population) * 100
-                    });
-                    self_item.markers.push(cityCircle);
-                  }
-            });
-        });
+    drawHeatmap(points) {
+        const valid = points.filter(p => Number.isFinite(p.weight) && p.weight > 0);
+        this.heatmap = L.heatLayer(valid.map(p => [p.lat, p.lng, p.weight]), {
+            radius: this.radius,
+            blur: 15,
+            // Keep full intensity at the initial city-wide zoom level
+            maxZoom: this.map.getZoom(),
+            max: d3.max(valid, p => p.weight) || 1,
+            gradient: this.useCustomGradient ? CUSTOM_GRADIENT : DEFAULT_GRADIENT,
+        }).addTo(this.map);
+        this.applyOpacity();
+        this.markers.push(this.heatmap);
     }
 
-//
-    setMapOnAll(map) {
-        for (let i = 0; i < this.markers.length; i++) {
-            this.markers[i].setMap(map);
-        }
+    /**
+     * @param circles array of {lat, lng, radius (metres), label}
+     */
+    drawCircles(circles) {
+        circles
+            .filter(c => Number.isFinite(c.radius) && c.radius > 0)
+            .forEach(c => {
+                const circle = L.circle([c.lat, c.lng], {...CIRCLE_STYLE, radius: c.radius})
+                    .bindTooltip(c.label)
+                    .addTo(this.map);
+                this.markers.push(circle);
+            });
     }
 
-//Clears all markers on the map
+    //Clears all markers on the map
     clearMarkers() {
-        this.setMapOnAll(null);
+        this.markers.forEach(layer => layer.remove());
+        this.markers = [];
+        this.heatmap = null;
     }
 
-    setHeatmap(map) {
-        d3.selectAll(".circle").remove();
-
-        let keyValues = [];
-        let self_item = this;
-        let citymap = [];
-        let heatMapData = [];
-
-        d3.json("stations.json", function (error, data) {
-            if (error) {
-                console.log("something went wrong");
-            }
-
-            let keys = Object.keys(data.stations);
-            let vals = Object.keys(data.stations).map(function (key) {
-                //combine this object to use later.
-                keyValues.push({k: key, title: data.stations[key].title.trim(), position: data.stations[key].position});
-                return data.stations[key];
-            });
-
-            //Get the selected year, type, and week/weekend for the data
-            let e = document.getElementById("data-type");
-            let type = e.options[e.selectedIndex].value;
-
-            let f = document.getElementById("data-week");
-            let week = f.options[f.selectedIndex].value;
-
-            let g = document.getElementById("data-year");
-            let year = g.options[g.selectedIndex].value;
-
-            //Retrieve the necessary data
-            d3.csv("tubedata/counts/" + year + "_Entry_Exit.csv", function (csvData) {
-                csvData.forEach(function (da) {
-                    if (parseInt(year) < 2009) {
-                        da.Entry_Weekday = +da.Entry_Weekday;
-                        da.Entry_Saturday = +da.Entry_Saturday;
-                        da.Entry_Sunday = +da.Entry_Sunday;
-                        da.Exit_Weekday = +da.Exit_Weekday;
-                        da.Exit_Saturday = +da.Exit_Saturday;
-                        da.Exit_Sunday = +da.Exit_Sunday;
-                    }
-                });
-
-                keyValues.forEach(function (d) {
-                    let val = csvData.filter(function (n) {
-                        return n.Station.trim() === d.title;
-                    });
-
-                    if (val.length === 0) {
-                        val.push({entry: 0});
-
-                    }
-
-                    //Construct object with all the information for the bubble chart
-                    citymap.push({
-                        title: d.title, center: {lat: d.position.lat, lng: d.position.lon},
-                        entWeek: val[0].Entry_Weekday,
-                        entSat: val[0].Entry_Saturday,
-                        entSun: val[0].Entry_Sunday,
-                        extWeek: val[0].Exit_Weekday,
-                        extSat: val[0].Exit_Saturday,
-                        extSun: val[0].Exit_Sunday
-                    });
-
-                    //here we construct an object that stores the information we need.
-                    //Construct heat map data
-                    // {location: new google.maps.LatLng(37.782, -122.443), weight: 2}
-                });
-
-                for (let city in citymap) {
-                    heatMapData.push({
-                        location: new google.maps.LatLng(citymap[city].center.lat, citymap[city].center.lng),
-                        weight: parseInt(citymap[city]["" + type + week + ""])
-                    });
-                }
-
-
-                self_item.heatmap = new google.maps.visualization.HeatmapLayer({
-                    data: heatMapData
-                });
-
-                self_item.heatmap.setMap(map);
-                self_item.heatmap.setOptions({
-                    radius: 15,
-                    maxIntensity: d3.max(heatMapData).weight,
-                    gradient: [ 'rgba(0, 255, 255, 0)',
-                        "#00FFFF",
-                        "#00EFFF",
-                        "#00DFFF",
-                        "#00D0FF",
-                        "#00C0FF",
-                        "#00B0FF",
-                        "#00A1FF",
-                        "#0091FF",
-                        "#0082FF",
-                        "#0072FF",
-                        "#0062FF",
-                        "#0053FF",
-                        "#0043FF",
-                        "#0034FF",
-                        "#0024FF",
-                        "#0014FF",
-                        "#0005FF",
-                        "#0A00FF",
-                        "#1A00FF",
-                        "#2900FF",
-                        "#3900FF",
-                        "#4800FF",
-                        "#5800FF",
-                        "#6800FF",
-                        "#7700FF",
-                        "#8700FF",
-                        "#9600FF",
-                        "#A600FF",
-                        "#B600FF",
-                        "#C500FF",
-                        "#D500FF",
-                        "#E400FF",
-                        "#F400FF",
-                        "#FF00F9",
-                        "#FF00EA",
-                        "#FF00DA",
-                        "#FF00CA",
-                        "#FF00BB",
-                        "#FF00AB",
-                        "#FF009C",
-                        "#FF008C",
-                        "#FF007C",
-                        "#FF006D",
-                        "#FF005D",
-                        "#FF004E",
-                        "#FF003E",
-                        "#FF002E",
-                        "#FF001F",
-                        "#FF000F",
-                        "#FF0000"]
-                        // 'rgba(0, 255, 255, 1)',
-                        // 'rgba(0, 191, 255, 1)',
-                        // 'rgba(0, 127, 255, 1)',
-                        // 'rgba(0, 63, 255, 1)',
-                        // 'rgba(0, 0, 255, 1)',
-                        // 'rgba(0, 0, 223, 1)',
-                        // 'rgba(0, 0, 191, 1)',
-                        // 'rgba(0, 0, 159, 1)',
-                        // 'rgba(0, 0, 127, 1)',
-                        // 'rgba(63, 0, 91, 1)',
-                        // 'rgba(127, 0, 63, 1)',
-                        // 'rgba(191, 0, 31, 1)',
-                        // 'rgba(255, 0, 0, 1)']
-                });
-
-                self_item.markers.push(self_item.heatmap);
-            });
-        });
-    }
-
-    changeGradient(gradient) {
+    changeGradient() {
+        this.useCustomGradient = !this.useCustomGradient;
         if (this.heatmap) {
-            this.heatmap.set('gradient', this.heatmap.get('gradient') ? null : gradient);
+            this.heatmap.setOptions({gradient: this.useCustomGradient ? CUSTOM_GRADIENT : DEFAULT_GRADIENT});
         }
     }
 
-    changeRadius(radius) {
-        let currRadius = this.heatmap.get('radius');
-        let newRadius = currRadius + radius;
-
-        this.heatmap.set('radius', newRadius >= 0 ? newRadius : 0);
-
-        return newRadius;
+    changeRadius(delta) {
+        this.radius = Math.max(1, this.radius + delta);
+        if (this.heatmap) this.heatmap.setOptions({radius: this.radius});
+        return this.radius;
     }
 
+    //Changes the opacity of the heatmap
+    changeOpacity(delta) {
+        this.opacity = Math.round(Math.min(1, Math.max(0, this.opacity + delta)) * 10) / 10;
+        this.applyOpacity();
+        return this.opacity;
+    }
 
-//Changes the opacity of the circles and the heatmap
-    changeOpacity(opacity) {
-        let currOpacity = this.heatmap.get('opacity');
-        let newOpacity = currOpacity + opacity;
+    applyOpacity() {
+        if (this.heatmap && this.heatmap._canvas) this.heatmap._canvas.style.opacity = this.opacity;
+    }
 
-        newOpacity = newOpacity > 1 ? 1 : newOpacity;
+    // Absolute setters for the sliders and toggles on map.html
+    setRadius(value) {
+        return this.changeRadius(value - this.radius);
+    }
 
-        this.heatmap.set('opacity', newOpacity >= 0 ? newOpacity : 0);
-        return newOpacity;
+    setOpacity(value) {
+        return this.changeOpacity(value - this.opacity);
+    }
+
+    setGradient(useCustom) {
+        if (useCustom !== this.useCustomGradient) this.changeGradient();
+    }
+}
+
+// Value of a control: the checked radio in a group, or a select's value
+const fieldValue = name => {
+    const checked = document.querySelector(`input[name="${CSS.escape(name)}"]:checked`);
+    if (checked) return checked.value;
+    const el = document.getElementById(name);
+    return el && 'value' in el ? el.value : '';
+};
+
+/*
+ * Yearly entry / exit counts per station
+ */
+class MAP extends OverlayMap {
+    /**
+     * @param map Leaflet map instance
+     * @param stations stations.json "stations" object
+     */
+    constructor(map, stations) {
+        super(map);
+        this.stations = stations;
+        this.resolve = TubeData.stationIndex(stations);
+        this.countsCache = new Map();
+    }
+
+    /** Current selection from the menus, or null if incomplete */
+    selection() {
+        const type = fieldValue("data-type");   // "ent" | "ext"
+        const week = fieldValue("data-week");   // "Week" | "Sat" | "Sun"
+        const year = fieldValue("data-year");
+        if (!type || !week || !year) return null;
+        const day = {Week: 'week', Sat: 'saturday', Sun: 'sunday'}[week];
+        return {year, field: `${type === 'ent' ? 'entry' : 'exit'}_${day}`};
+    }
+
+    /** Resolves to [{title, lat, lng, value}] for the current selection */
+    async stationValues() {
+        const sel = this.selection();
+        if (!sel) return null;
+        if (!this.countsCache.has(sel.year)) this.countsCache.set(sel.year, TubeData.loadCounts(sel.year));
+        const rows = await this.countsCache.get(sel.year);
+
+        const valueByKey = new Map();
+        rows.forEach(row => this.resolve(row.station).forEach(key => {
+            if (!valueByKey.has(key)) valueByKey.set(key, row[sel.field]);
+        }));
+
+        return Object.entries(this.stations)
+            .filter(([key, s]) => s.position && valueByKey.has(key))
+            .map(([key, s]) => ({
+                title: s.title.trim(),
+                lat: s.position.lat,
+                lng: s.position.lon,
+                value: valueByKey.get(key),
+            }));
+    }
+
+    async setCircles() {
+        const id = this.nextRequest();
+        const values = await this.stationValues();
+        if (!values || !this.isCurrent(id)) return;
+        this.clearMarkers();
+        //Here we set the radius according to the selected count
+        this.drawCircles(values.map(d => ({...d, radius: d.value / 50, label: `${d.title}: ${d3.format(',')(d.value)}`})));
+    }
+
+    async setHeatmap() {
+        const id = this.nextRequest();
+        const values = await this.stationValues();
+        if (!values || !this.isCurrent(id)) return;
+        this.clearMarkers();
+        this.drawHeatmap(values.map(d => ({...d, weight: d.value})));
     }
 }

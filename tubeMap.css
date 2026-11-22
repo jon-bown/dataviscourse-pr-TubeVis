@@ -31,21 +31,6 @@ src: url('digital-7/digital-7 (mono).ttf');
 }
 
 
-.clock{
-  font-family: 'digital-7';
-  background-color:#333;
-  font-size:60px;
-
-  text-shadow:0px 0px 1px #fff;
-  color: #F7F122;
-  /*color:#fff;*/
-
-}
-
-.journey{
-  font-family: 'digital-7';
-  font-size:30px;
-}
 a {
   text-decoration: none;
   color: rgba(0,0,0,0.87);
@@ -132,18 +117,23 @@ text {
 text.highlighted {
   text-decoration: line-through;
 }
-.keyLineItem
-{
-	float: left;
+/* Entries/Exits key: dots matching the animation's station circles */
+.keyRow {
+	display: flex;
+	align-items: center;
+	gap: 8px;
 	margin: 4px 5px;
-	width: 18px;
-	height: 4px;
-	border-radius: 2px;
-	cursor: pointer;
+}
+.keyCircle
+{
+	flex: none;
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
 }
 .keyItemText
 {
-	float: left; font-size: 15px;
+	font-size: 15px;
 }
 
 .line {
@@ -187,7 +177,17 @@ text.highlighted {
 .label {
   transition-property: opacity;
   transition-duration: .5s;
+  /* Scale each label around itself, not around the centre of the whole SVG */
+  transform-box: fill-box;
   transform-origin: 50% 50%;
+}
+
+.line-station-label:hover {
+  text-decoration: underline;
+}
+
+.line-station-label.selectedName {
+  font-weight: bold;
 }
 
 .label.translucent {
@@ -289,11 +289,15 @@ text.highlighted {
 }
 
 .stationSelected{
-  fill: steelblue;
+  fill: #2a78d6;
 }
 
 .stationSelect:hover{
-  fill: orange;
+  fill: #b7d3f6;
+}
+
+.compareSelected{
+  fill: #eb6834;
 }
 
 .mainBarWrapper {
@@ -325,10 +329,10 @@ text.highlighted {
 }
 
 .barChartDropDown {
-  width: 200px;
   display: none;
   flex-direction: column;
-  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 
@@ -340,9 +344,7 @@ text.highlighted {
   display: flex;
 }
 
-.dropleft, .dropRight {
-  padding: 5px;
-}
+
 
 
 
@@ -400,4 +402,344 @@ text.highlighted {
 }
 .showMe {
   display: flex;
+}
+
+/* ---- Layout (previously inline styles in index.html) ---- */
+body {
+  background: #fff;
+}
+
+#floating-panel1 {
+  margin-left: 30px;
+  margin-bottom: 10px;
+}
+
+/* Data type, play button and the playback bar */
+.tube-toolbar {
+  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.animation-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+}
+
+.animation-controls[hidden],
+#tube-button[hidden] {
+  display: none;
+}
+
+.animation-controls .slider {
+  align-self: center;
+}
+
+/* Straightened-line view: back, yearly counts and compare */
+.line-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+}
+
+.compare-field .select {
+  min-width: 200px;
+}
+
+#tube-map {
+  width: 80%;
+  height: 80%;
+  margin: 0 30px 30px 30px;
+}
+
+/* Controls on the left, departure-board clock to their right */
+.control-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 16px;
+}
+
+/* Styled after a platform departure board: amber dot-matrix style digits on black */
+.animation-status {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  /* Fixed width so the panel doesn't shrink when the countdown becomes the clock */
+  box-sizing: border-box;
+  width: 390px;
+  max-width: 100%;
+  padding: 10px 20px;
+  border-radius: 12px;
+  background: #111;
+  box-shadow: inset 0 0 0 2px #2b2b2b;
+  text-align: center;
+}
+
+.animation-status[hidden] {
+  display: none;
+}
+
+.clock {
+  font-family: 'digital-7', monospace;
+  font-size: 42px;
+  line-height: 1;
+  color: #F7F122;
+  text-shadow: 0 0 6px rgba(247, 241, 34, 0.45);
+  white-space: nowrap;
+}
+
+/* Running total of journeys, under the clock */
+.journey {
+  min-height: 1em;
+  font-family: 'digital-7', monospace;
+  font-size: 22px;
+  line-height: 1;
+  color: #F7F122;
+  opacity: 0.85;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+/* Yearly entry/exit line chart paths are lines, not filled areas */
+.linechart path.line {
+  fill: none;
+  stroke-width: 2;
+}
+
+
+
+/* ---- Straightened-line view: page scrolls; station charts sit between
+   the menus and the line, which moves down to make room ---- */
+body.line-mode {
+  overflow-y: auto;
+}
+
+#tube-map {
+  display: flex;
+  flex-direction: column;
+}
+
+#tube-map > .barChartWrapper {
+  order: 1;
+}
+
+#tube-map > #container {
+  order: 2;
+  flex: none;
+}
+
+/* ---- Station survey charts ---- */
+.barChartWrapper {
+  --chart-surface: #ffffff;
+  --chart-border: #e4e2dc;
+  --chart-hover: #f4f3ef;
+  --chart-grid: #ebe9e4;
+  --chart-baseline: #c9c7c0;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #76756f;
+  width: 100%;
+  max-width: 1400px;
+  padding-bottom: 8px;
+  scroll-margin-top: 12px;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text-primary);
+}
+
+.barChartWrapper.showMe {
+  display: block;
+}
+
+.surveyHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 20px;
+  margin: 4px 0 14px;
+}
+
+.surveyHeader h2 {
+  margin: 0;
+  font: 24px 'Hammersmith One', sans-serif;
+  color: var(--text-primary);
+}
+
+.surveyLegend {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.surveyLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.surveyLegendItem .swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.surveyNote {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.surveyGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.surveyCard {
+  margin: 0;
+  padding: 14px 16px 10px;
+  background: var(--chart-surface);
+  border: 1px solid var(--chart-border);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  min-width: 0;
+}
+
+.surveyCard figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.surveyTitle {
+  font: 17px 'Hammersmith One', sans-serif;
+  color: var(--text-primary);
+}
+
+.surveySub {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.surveyChart {
+  display: block;
+  overflow: visible;
+}
+
+.surveyChart text {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+  user-select: none;
+}
+
+.surveyChart .category-label {
+  fill: var(--text-primary);
+  font-size: 12px;
+}
+
+.surveyChart .value-label {
+  fill: var(--text-secondary);
+  font-size: 11px;
+}
+
+.surveyChart .tick-labels text {
+  fill: var(--text-muted);
+  font-size: 10px;
+}
+
+.surveyChart .grid line {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+
+.surveyChart .baseline {
+  stroke: var(--chart-baseline);
+  stroke-width: 1;
+}
+
+.surveyChart .rowHover {
+  fill: transparent;
+  rx: 4px;
+}
+
+.surveyChart .surveyRow:hover .rowHover {
+  fill: var(--chart-hover);
+}
+
+.chart-tooltip {
+  position: fixed;
+  z-index: 10;
+  min-width: 160px;
+  padding: 8px 10px;
+  pointer-events: none;
+  background: #ffffff;
+  border: 1px solid #e4e2dc;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font: 12px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #0b0b0b;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.chart-tooltip.visible {
+  opacity: 1;
+}
+
+.chart-tooltip .tt-title {
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.chart-tooltip .tt-row {
+  display: grid;
+  grid-template-columns: 10px 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-tooltip .tt-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.chart-tooltip .tt-value {
+  font-weight: 600;
+}
+
+.chart-tooltip .tt-count {
+  color: #52514e;
+}
+
+/* ---- Tube map page type (shared font, title and tabs live in site.css) ---- */
+.legendTitle {
+  /* Start below the floated Entries/Exits circle key */
+  clear: both;
+  padding-top: 8px;
+  font-size: 18px;
+  font-weight: normal;
+}
+
+/* Chart numbers keep a system font with even-width digits */
+.surveyChart .value-label,
+.surveyChart .tick-labels text,
+.chart-tooltip .tt-value,
+.chart-tooltip .tt-count {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.barChartWrapper,
+.surveyChart .category-label,
+.chart-tooltip {
+  font-family: 'Hammersmith One', 'Gill Sans', 'Gill Sans MT', sans-serif;
 }

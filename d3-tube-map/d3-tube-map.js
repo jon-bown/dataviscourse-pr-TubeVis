@@ -33,8 +33,7 @@
         var s;
         let dataStore = null;
         let currentStationSelection = null;
-        const selectColor = 'steelblue';
-        const otherColor = 'grey';
+        let lineModeActive = false;
         const parseTime = d3.timeParse("%Y");
         const lineChartWidth = 600;
         const lineChartHeight = 400;
@@ -47,85 +46,13 @@
             .attr('width', lineChartWidth + lineChartMargin.left + lineChartMargin.right)
             .attr('height', lineChartHeight + lineChartMargin.top + lineChartMargin.bottom)
 
-        const barChartWidth = 300;
-        const barChartHeight = 250;
-
-        const BAR_OFFSET = 20;
-        const BAR_TOP_OFFSET = 10;
-
-        const ageSVG = d3.select('.ageChart').append('svg').attr("id", "ageChart")
-            .attr('height', barChartHeight + lineChartMargin.top + lineChartMargin.bottom)
-            .attr('width', barChartWidth + lineChartMargin.left + lineChartMargin.right)
-
-            .append("g")
-            .classed('ageBarChart', true)
-            .attr("transform", "translate(" + lineChartMargin.left + "," + BAR_TOP_OFFSET+ ")");
-
-        const sexSVG = d3.select('.sexChart').append('svg')
-            .attr('width', barChartWidth + lineChartMargin.left + lineChartMargin.right)
-            .attr('height', barChartHeight + lineChartMargin.top + lineChartMargin.bottom)
-            .append("g")
-            .classed('sexChart', true)
-            .attr("transform", "translate(" + lineChartMargin.left + "," + BAR_TOP_OFFSET + ")");
-
-        const journeyChartSVG = d3.select('.journeyChart').append('svg')
-            .attr('width', barChartWidth + lineChartMargin.left + lineChartMargin.right)
-            .attr('height', barChartHeight + lineChartMargin.top + lineChartMargin.bottom)
-            .append("g")
-            .classed('journeyChart', true)
-            .attr("transform", "translate(" + lineChartMargin.left + "," + BAR_TOP_OFFSET + ")");
-
-        const marketSVG = d3.select('.marketChart').append('svg')
-            .attr('width', barChartWidth + lineChartMargin.left + lineChartMargin.right)
-            .attr('height', barChartHeight + lineChartMargin.top + lineChartMargin.bottom)
-            .append("g")
-            .classed('marketChart', true)
-            .attr("transform", "translate(" + lineChartMargin.left + "," + BAR_TOP_OFFSET + ")");
-
-
-        // const ageDiffSVG = d3.select(".ageDiffChart").append('svg')
-        //     .attr('width', barChartWidth + lineChartMargin.left + lineChartMargin.right)
-        //     .attr('height', barChartHeight + lineChartMargin.top + lineChartMargin.bottom)
-        //     .append("g")
-        //     .classed('ageDiffChart', true)
-        //     .attr("transform", "translate(" + lineChartMargin.left + "," + BAR_TOP_OFFSET + ")");
-        //
-        //
-        // const sexDiffSVG = d3.select(".sexDiffChart").append('svg')
-        //     .attr('width', barChartWidth + lineChartMargin.left + lineChartMargin.right)
-        //     .attr('height', barChartHeight + lineChartMargin.top + lineChartMargin.bottom)
-        //     .append("g")
-        //     .classed('sexDiffChart', true)
-        //     .attr("transform", "translate(" + lineChartMargin.left + "," + BAR_TOP_OFFSET + ")");
-        //
-        // const journeyDiffSVG = d3.select(".journeyDiffChart").append('svg')
-        //     .attr('width', barChartWidth + lineChartMargin.left + lineChartMargin.right)
-        //     .attr('height', barChartHeight + lineChartMargin.top + lineChartMargin.bottom)
-        //     .append("g")
-        //     .classed('journeyDiffChart', true)
-        //     .attr("transform", "translate(" + lineChartMargin.left + "," + BAR_TOP_OFFSET + ")");
-        //
-        // const marketDiffSVG = d3.select(".marketDiffChart").append('svg')
-        //     .attr('width', barChartWidth + lineChartMargin.left + lineChartMargin.right)
-        //     .attr('height', barChartHeight + lineChartMargin.top + lineChartMargin.bottom)
-        //     .append("g")
-        //     .classed('marketDiffChart', true)
-        //     .attr("transform", "translate(" + lineChartMargin.left + "," + BAR_TOP_OFFSET + ")");
-
-
         const calcExtents = data => {
-            let yExtents = [0, 0];
-            data.forEach((d)=> {
-                const temp = d3.extent([d.saturday, d.sunday, d.week])
-                yExtents = [Math.min(temp[0], yExtents[0]), Math.max(temp[1], yExtents[1])];
-        });
-
-            return yExtents
+            // d3.max ignores NaN, so missing values don't poison the domain
+            const max = d3.max(data, d=>d3.max([d.saturday, d.sunday, d.week]));
+            return [0, max || 0];
 
         }
 
-        const alphabet = "abcdefghijklmnopqrstuvwxyz";
-        const alphabetArray = alphabet.split('');
         const formatEntryData = data=> {
             return data.map(d=>({
                 saturday: d.entry_saturday,
@@ -155,7 +82,10 @@
 
 
         const filterDataByCity = city => {
-            const filtered = dataStore.yearData.filter(d=>d.station === city);
+            // One row per year (a station can match more than one CSV spelling)
+            const filtered = Array.from(d3.group(
+                dataStore.yearData.filter(d=>d.keys.includes(city)), d=>d.year
+            ).values(), rows=>rows[0]);
             const entryData = formatEntryData(filtered);
             const exitData = formatExitData(filtered);
             return prepareDataForLine(entryData, exitData)
@@ -218,360 +148,352 @@
 
         }
 
+        // ---- Station survey charts (2016 RODS) ---------------------------------
+        // One horizontal bar chart per survey question. Values are each answer's
+        // share of the station's respondents, so two stations of very different
+        // size can be compared directly; raw counts are in the tooltip.
+        const SERIES_COLORS = ['#2a78d6', '#eb6834']; // selected station, comparison station
+        const SURVEY_CHARTS = [
+            {label: 'Age', selector: '.ageChart'},
+            {label: 'Sex', selector: '.sexChart'},
+            {label: 'Journey', selector: '.journeyChart'},
+            {label: 'Market', selector: '.marketChart'},
+        ];
+        const SURVEY_LAYOUT = {labelWidth: 76, valueWidth: 40, barHeight: 12, barGap: 2, rowPad: 10, axisHeight: 18};
+        const formatCount = d3.format(',.0f');
+        const formatShare = share => (share > 0 && share < 0.01) ? '<1%' : d3.format('.0%')(share);
+        let lastSurveyStations = null;
+
         const formatBarData = (data)=> {
             if (!data) return;
             const {age, journey, market} = data;
-            const ageData = [];
-            if (age.length === 0 || journey.length === 0 || market.length === 0) alert(' Error in CSV and JSON name');
-            ageMap.forEach((category, key)=> ageData.push({category, value: age[0][key] + age[1][key]}));
+            if (age.length === 0 || journey.length === 0 || market.length === 0) {
+                alert('No 2016 survey data is available for this station.');
+                return null;
+            }
+            // Sum the matching rows (the exit and entry survey files)
+            const sum = (rows, key) => d3.sum(rows, d=>d[key]);
 
-            const sexData = [{category: 'Male', value: age[0].male + age[1].male},
-                {category: 'Female', value: age[0].female + age[1].female}];
+            const ageData = [];
+            ageMap.forEach((category, key)=> ageData.push({category, value: sum(age, key)}));
+
+            const sexData = [{category: 'Male', value: sum(age, 'male')},
+                {category: 'Female', value: sum(age, 'female')}];
 
             const journeyData = [];
-            journeyMap.forEach((category, key)=> journeyData.push({
-                category,
-                value: journey[0][key] + journey[1][key]
-            }))
+            journeyMap.forEach((category, key)=> journeyData.push({category, value: sum(journey, key)}));
 
             const marketData = [];
-            marketMap.forEach((category, key)=> marketData.push({category, value: market[0][key] + market[1][key]}));
+            marketMap.forEach((category, key)=> marketData.push({category, value: sum(market, key)}));
 
             return [
-                {label: 'Age', data: ageData, selector: 'ageChart', color: 'green'},
-                {label: 'Sex', data: sexData, selector: 'sexChart', color: 'steelblue'},
-                {label: 'Journey', data: journeyData, selector: 'journeyChart', color: 'orange'},
-                {label: 'Market', data: marketData, selector: 'marketChart', color: 'grey'}];
+                {label: 'Age', data: ageData},
+                {label: 'Sex', data: sexData},
+                {label: 'Journey', data: journeyData},
+                {label: 'Market', data: marketData}];
         }
         const filetBarDataByStation = station => {
             const {ageData, marketData, journeyData} = dataStore;
-            const age = ageData.filter(d=>d.station === station);
-            const journey = journeyData.filter(d=>d.station === station);
-            const market = marketData.filter(d=>d.station === station);
+            const age = ageData.filter(d=>d.keys.includes(station));
+            const journey = journeyData.filter(d=>d.keys.includes(station));
+            const market = marketData.filter(d=>d.keys.includes(station));
             return formatBarData({age, journey, market});
 
         }
 
-        const makeBarChart = (bardata) => {
-            const {label, selector, data, color} = bardata;
-            const x = d3.scaleBand()
-                .range([0, barChartWidth])
-                .padding(0.1);
-            var y = d3.scaleLinear().domain([0, d3.max(data, d=>d.value)])
-                .range([barChartHeight - BAR_OFFSET, 0]);
+        // Horizontal bar with a 4px rounded data end and a square baseline end
+        const barPath = (x, y, w, h) => {
+            const r = Math.max(0, Math.min(4, w, h / 2));
+            return `M${x},${y}h${w - r}a${r},${r} 0 0 1 ${r},${r}v${h - 2 * r}` +
+                `a${r},${r} 0 0 1 ${-r},${r}h${-(w - r)}Z`;
+        };
 
-            x.domain(data.map(d=>d.category));
+        const surveyTooltip = () => {
+            let tip = d3.select('body').select('.chart-tooltip');
+            if (tip.empty()) {
+                tip = d3.select('body').append('div').attr('class', 'chart-tooltip').attr('aria-hidden', 'true');
+            }
+            return tip;
+        };
 
+        const moveSurveyTooltip = event => {
+            const tip = surveyTooltip();
+            const node = tip.node();
+            const pad = 14;
+            let left = event.clientX + pad;
+            let top = event.clientY + pad;
+            if (left + node.offsetWidth > window.innerWidth - 8) left = event.clientX - node.offsetWidth - pad;
+            if (top + node.offsetHeight > window.innerHeight - 8) top = event.clientY - node.offsetHeight - pad;
+            tip.style('left', `${left}px`).style('top', `${top}px`);
+        };
 
-            let barChart = null;
+        const showSurveyTooltip = (event, category, series, shares) => {
+            const tip = surveyTooltip();
+            tip.selectAll('*').remove();
+            tip.append('div').attr('class', 'tt-title').text(category);
+            series.forEach((s, i) => {
+                const {share, count} = shares[i].get(category);
+                const row = tip.append('div').attr('class', 'tt-row');
+                row.append('span').attr('class', 'tt-swatch').style('background', s.color);
+                row.append('span').attr('class', 'tt-name').text(s.name);
+                row.append('span').attr('class', 'tt-value').text(formatShare(share));
+                row.append('span').attr('class', 'tt-count').text(`${formatCount(count)} people`);
+            });
+            tip.classed('visible', true);
+            moveSurveyTooltip(event);
+        };
 
-            let barGroup = null;
+        const hideSurveyTooltip = () => d3.select('.chart-tooltip').classed('visible', false);
 
-            switch (label) {
-                case 'Age':
-                    barChart = ageSVG;
-                    y = d3.scaleLinear().domain([0, d3.max(data, d=>d.value)])
-                        .range([barChartHeight - BAR_OFFSET, 0]);
-                        barGroup = barChart.append('g').classed('barGroup', true);
-                        barGroup.selectAll(".bar")
-                            .data(data)
-                            .enter().append("rect")
-                            .attr("class", "bar")
-                            .attr('fill', selectColor)
-                            .attr("x", d=>x(d.category))
-                    .attr("width", x.bandwidth())
-                            .attr("y", d=>y(d.value))
-                    .attr("height", d=> barChartHeight - BAR_OFFSET - y(d.value))
+        const renderSurveyChart = (selector, title, series) => {
+            const root = d3.select(selector);
+            root.selectAll('*').remove();
+            const L = SURVEY_LAYOUT;
+            const categories = series[0].rows.map(d => d.category);
+            const shares = series.map(s => {
+                const total = d3.sum(s.rows, d => d.value);
+                return new Map(s.rows.map(d => [d.category, {count: d.value, share: total ? d.value / total : 0}]));
+            });
 
-                    d3.select("#ageChart").attr("height", 300)
+            const width = Math.max(220, root.node().clientWidth || 260);
+            const rowHeight = series.length * L.barHeight + (series.length - 1) * L.barGap + L.rowPad;
+            const plotBottom = categories.length * rowHeight;
+            const height = plotBottom + L.axisHeight;
+            const plotWidth = width - L.labelWidth - L.valueWidth;
+            const maxShare = d3.max(shares, m => d3.max(Array.from(m.values()), d => d.share)) || 1;
+            const x = d3.scaleLinear().domain([0, maxShare]).nice(4).range([0, plotWidth]);
+            const y = d3.scaleBand().domain(categories).range([0, plotBottom]);
+            const ticks = x.ticks(plotWidth < 170 ? 3 : 4);
 
+            const summary = series.map((s, i) => `${s.name}: ` + categories
+                .map(c => `${c} ${formatShare(shares[i].get(c).share)}`).join(', ')).join('. ');
+            const chart = root.append('svg')
+                .attr('class', 'surveyChart')
+                .attr('width', width)
+                .attr('height', height)
+                .attr('role', 'img')
+                .attr('aria-label', `${title}. ${summary}`);
+            const plot = chart.append('g').attr('transform', `translate(${L.labelWidth},0)`);
 
-                        barGroup.append("g")
-                            .attr("transform", "translate(0," + (barChartHeight - BAR_OFFSET) + ")")
-                            .call(d3.axisBottom(x))
-                            .selectAll("text")
-                            .style("text-anchor", "end")
-                            .attr("dx", "-.8em")
-                            .attr("dy", ".15em")
-                            .attr("transform", "rotate(-50)");
+            plot.append('g').attr('class', 'grid').selectAll('line').data(ticks.filter(t => t > 0)).join('line')
+                .attr('x1', x).attr('x2', x)
+                .attr('y1', 0).attr('y2', plotBottom);
+            plot.append('g').attr('class', 'tick-labels').selectAll('text').data(ticks).join('text')
+                .attr('x', x)
+                .attr('y', height - 4)
+                .attr('text-anchor', (d, i) => i === 0 ? 'start' : 'middle')
+                .text(formatShare);
 
+            const rows = plot.selectAll('g.surveyRow').data(categories).join('g')
+                .attr('class', 'surveyRow')
+                .attr('transform', d => `translate(0,${y(d)})`);
 
-                        barGroup.append("g")
-                            .call(d3.axisLeft(y)
-                                .ticks(6, 's'));
-                    break;
-                case 'Sex':
-                    barChart = sexSVG
-                    barGroup = barChart.append('g').classed('barGroup', true);
-                    barGroup.selectAll(".bar")
-                        .data(data)
-                        .enter().append("rect")
-                        .attr("class", "bar")
-                        .attr('fill', selectColor)
-                        .attr("x", d=>x(d.category))
-                .attr("width", x.bandwidth())
-                        .attr("y", d=>y(d.value))
-                .attr("height", d=> barChartHeight - BAR_OFFSET - y(d.value));
+            // The hover target spans the whole row, label included
+            rows.append('rect')
+                .attr('class', 'rowHover')
+                .attr('x', -L.labelWidth)
+                .attr('width', width)
+                .attr('height', rowHeight);
 
+            rows.append('text')
+                .attr('class', 'category-label')
+                .attr('x', -8)
+                .attr('y', rowHeight / 2)
+                .attr('dy', '0.35em')
+                .attr('text-anchor', 'end')
+                .text(d => d);
 
-                    barGroup.append("g")
-                        .attr("transform", "translate(0," + (barChartHeight - BAR_OFFSET) + ")")
-                        .call(d3.axisBottom(x))
-                        .selectAll("text")
-                        .style("text-anchor", "end")
-                        .attr("dx", "-.8em")
-                        .attr("dy", ".15em")
-                        .attr("transform", "rotate(-50)");
+            series.forEach((s, i) => {
+                const barY = L.rowPad / 2 + i * (L.barHeight + L.barGap);
+                rows.append('path')
+                    .attr('class', 'bar')
+                    .attr('fill', s.color)
+                    .attr('d', barPath(0, barY, 0, L.barHeight))
+                    .transition()
+                    .duration(450)
+                    .delay((d, j) => j * 25)
+                    .ease(d3.easeCubicOut)
+                    .attrTween('d', category => {
+                        const w = x(shares[i].get(category).share);
+                        return t => barPath(0, barY, w * t, L.barHeight);
+                    });
+            });
 
-
-                    barGroup.append("g")
-                        .call(d3.axisLeft(y)
-                            .ticks(6, 's'));
-                    break;
-                case 'Journey':
-                    barChart = journeyChartSVG;
-                    barGroup = barChart.append('g').classed('barGroup', true);
-                    barGroup.selectAll(".bar")
-                        .data(data)
-                        .enter().append("rect")
-                        .attr("class", "bar")
-                        .attr('fill', selectColor)
-                        .attr("x", d=>x(d.category))
-                .attr("width", x.bandwidth())
-                        .attr("y", d=>y(d.value))
-                .attr("height", d=> barChartHeight - BAR_OFFSET - y(d.value));
-
-
-                    barGroup.append("g")
-                        .attr("transform", "translate(0," + (barChartHeight - BAR_OFFSET) + ")")
-                        .call(d3.axisBottom(x))
-                        .selectAll("text")
-                        .style("text-anchor", "end")
-                        .attr("dx", "-.8em")
-                        .attr("dy", ".15em")
-                        .attr("transform", "rotate(-50)");
-
-
-                    barGroup.append("g")
-                        .call(d3.axisLeft(y)
-                            .ticks(6, 's'));
-                    break;
-                case 'Market':
-                    barChart = marketSVG;
-                    barGroup = barChart.append('g').classed('barGroup', true);
-                    barGroup.selectAll(".bar")
-                        .data(data)
-                        .enter().append("rect")
-                        .attr("class", "bar")
-                        .attr('fill', selectColor)
-                        .attr("x", d=>x(d.category))
-                .attr("width", x.bandwidth())
-                        .attr("y", d=>y(d.value))
-                .attr("height", d=> barChartHeight - BAR_OFFSET - y(d.value));
-
-
-                    barGroup.append("g")
-                        .attr("transform", "translate(0," + (barChartHeight - BAR_OFFSET) + ")")
-                        .call(d3.axisBottom(x))
-                        .selectAll("text")
-                        .style("text-anchor", "end")
-                        .attr("dx", "-.8em")
-                        .attr("dy", ".15em")
-                        .attr("transform", "rotate(-50)");
-
-
-                    barGroup.append("g")
-                        .call(d3.axisLeft(y)
-                            .ticks(6, 's'));
-                    break;
-                default:
-                    return barChart;
+            // A single station gets its value at the bar tip; a comparison
+            // leaves the numbers to the axis and tooltip to keep it readable
+            if (series.length === 1) {
+                rows.append('text')
+                    .attr('class', 'value-label')
+                    .attr('x', d => x(shares[0].get(d).share) + 6)
+                    .attr('y', rowHeight / 2)
+                    .attr('dy', '0.35em')
+                    .text(d => formatShare(shares[0].get(d).share));
             }
 
+            plot.append('line')
+                .attr('class', 'baseline')
+                .attr('x1', 0).attr('x2', 0)
+                .attr('y1', 0).attr('y2', plotBottom);
 
+            rows.on('mouseenter', (event, category) => showSurveyTooltip(event, category, series, shares))
+                .on('mousemove', moveSurveyTooltip)
+                .on('mouseleave', hideSurveyTooltip);
+        };
 
-            // d3.select('body').classed('modal', true);
-            // d3.select('.zoomRect').classed('modal', true);
-            // d3.select('.closebarChart').on('click', ()=> {
-            //     d3.select('body').classed('modal', false);
-            //     d3.select('.zoomRect').classed('modal', false);
-            //     d3.select('.barChartWrapper').classed('showMe', false);
-            // })
+        const renderSurveyHeader = series => {
+            const header = d3.select('.surveyHeader');
+            header.selectAll('*').remove();
+            header.append('h2').text(series.map(s => s.name).join(' vs '));
+            if (series.length > 1) {
+                const legend = header.append('div').attr('class', 'surveyLegend');
+                series.forEach(s => {
+                    const item = legend.append('span').attr('class', 'surveyLegendItem');
+                    item.append('span').attr('class', 'swatch').style('background', s.color);
+                    item.append('span').text(s.name);
+                });
+            }
+            header.append('p').attr('class', 'surveyNote')
+                .text('Share of each station’s respondents in the 2016 Rolling Origin & Destination Survey. ' +
+                    'Hover a row for the number of people.');
+        };
 
-        }
+        // Draws the four survey charts for one station, or two to compare.
+        // Returns false when a station has no survey data.
+        // The charts sit above the line, so a station picked further down the
+        // page would fill them in out of sight: bring their top into view
+        const revealSurvey = () => {
+            const node = d3.select('.barChartWrapper').node();
+            if (!node) return;
+            const top = node.getBoundingClientRect().top;
+            if (top < 0 || top > window.innerHeight * 0.6) {
+                node.scrollIntoView({behavior: 'smooth', block: 'start'});
+            }
+        };
+
+        const renderSurvey = (stationKeys, reveal = false) => {
+            const datasets = stationKeys.map(filetBarDataByStation);
+            if (datasets.some(d => !d)) return false;
+            const series = datasets.map((data, i) => ({
+                name: stationTitle(stationKeys[i]),
+                color: SERIES_COLORS[i],
+                data,
+            }));
+            lastSurveyStations = stationKeys;
+            hideSurveyTooltip();
+            d3.select('.barChartWrapper').classed('showMe', true);
+            renderSurveyHeader(series);
+            SURVEY_CHARTS.forEach(({label, selector}) => {
+                const title = d3.select(selector).attr('data-title') || label;
+                renderSurveyChart(selector, title, series.map(s => ({
+                    name: s.name,
+                    color: s.color,
+                    rows: s.data.find(d => d.label === label).data,
+                })));
+            });
+            if (reveal) revealSurvey();
+            return true;
+        };
+
+        let surveyResizeTimer = null;
+        window.addEventListener('resize', () => {
+            clearTimeout(surveyResizeTimer);
+            surveyResizeTimer = setTimeout(() => {
+                if (lastSurveyStations && d3.select('.barChartWrapper').classed('showMe')) {
+                    renderSurvey(lastSurveyStations);
+                }
+            }, 150);
+        });
+
+        const hideSurvey = () => {
+            lastSurveyStations = null;
+            currentStationSelection = null;
+            hideSurveyTooltip();
+            d3.select('.barChartWrapper').classed('showMe', false);
+        };
 
         const barChartFactory = station => {
-            console.log(station, 'clicked')
             currentStationSelection = station;
-            const bardata = filetBarDataByStation(station);
-            d3.select('.mainBarWrapper').classed('showMe', true);
-            d3.select('.barChartWrapper').classed('showMe', true);
-            d3.selectAll('.barGroup').remove();
-            bardata.forEach(bar=>makeBarChart(bar))
-
+            d3.selectAll('.station-circle').classed('compareSelected', false);
+            d3.select('.selectLeft').property('selectedIndex', 0);
+            if (!renderSurvey([station], true)) d3.select('.barChartWrapper').classed('showMe', false);
         }
 
-        const formatBarDiffData = (options)=> {
-            console.log(options, 'Selected')
-            // const selectA = filetBarDataByStation('WoodLane');
-            // const selectB = filetBarDataByStation('RoyalOak');
-            const selectA = filetBarDataByStation(options[0]);
-            const selectB = filetBarDataByStation(options[1]);
-            const barDiffData = [];
-            selectA.forEach((item, index)=> {
-                const data = item.data.map((d, i)=> {
-                    const nextVal = selectB.filter(d=>d.label === item.label)[0];
-            return {
-                category: alphabetArray[i].toUpperCase(),
-                valueA: d.value,
-                valueB: nextVal.data.filter(e=>e.category === d.category)[0].value,
-                label: d.category
+        // Lay a line's stations out as a "snake": rows that fill the visible
+        // width, alternating direction, joined by rounded U-turns. Coordinates
+        // are in map space (the map group is shifted up 100px in line mode).
+        const SNAKE = {spacing: 90, rowGap: 130, left: 90, top: 200};
+        const snakeLayout = count => {
+            const host = document.getElementById('tube-map');
+            let available = (host && host.clientWidth) || 1600;
+            // Stop short of the legend panel pinned to the right of the page
+            const legend = document.querySelector('.legendWrapper');
+            if (host && legend && legend.offsetParent) {
+                const room = legend.getBoundingClientRect().left - host.getBoundingClientRect().left - 20;
+                if (room > 0) available = Math.min(available, room);
+            }
+            const turn = SNAKE.rowGap / 2;
+            // Leave room on the right for the U-turn's bulge
+            const usable = available - SNAKE.left - turn - 20;
+            const perRow = Math.max(2, Math.min(count, Math.floor(usable / SNAKE.spacing) + 1));
+            const points = d3.range(count).map(j => {
+                const row = Math.floor(j / perRow);
+                const col = j % perRow;
+                const column = row % 2 === 0 ? col : perRow - 1 - col;
+                return [SNAKE.left + column * SNAKE.spacing, SNAKE.top + row * SNAKE.rowGap];
+            });
+            let path = `M${points[0][0]},${points[0][1]}`;
+            for (let j = 1; j < count; j++) {
+                const [x, y] = points[j];
+                if (y !== points[j - 1][1]) {
+                    // Rounded U-turn, bulging out past the right edge on even
+                    // rows and the left edge on odd rows. A cubic curve rather
+                    // than an SVG arc: the line animates by interpolating the
+                    // numbers in its path, which would corrupt an arc's 0/1 flags.
+                    const bulge = (Math.floor((j - 1) / perRow) % 2 === 0 ? 1 : -1) * turn * 4 / 3;
+                    const [px, py] = points[j - 1];
+                    path += `C${px + bulge},${py} ${x + bulge},${y} ${x},${y}`;
+                } else {
+                    path += `L${x},${y}`;
+                }
+            }
+            const rows = Math.ceil(count / perRow);
+            return {points, path, height: SNAKE.top + (rows - 1) * SNAKE.rowGap};
+        };
+
+        // A station on the straightened line was picked, by its dot or its name
+        const selectLineStation = name => {
+            d3.select('#line').selectAll('.station-circle')
+                .classed('notSelected', true)
+                .classed('stationSelected', d => d.name === name);
+            d3.select('#line').selectAll('.line-station-label')
+                .classed('selectedName', d => d.name === name);
+            barChartFactory(name);
         }
-        })
-            barDiffData.push({label: item.label, data});
-        })
 
-            return barDiffData;
-
-        }
-
+        const stationTitle = key => {
+            const station = dataStore && dataStore.stations.stations[key];
+            return station && station.title ? station.title : key;
+        };
 
         const dropDownFactory = ({nodes})=> {
             const stations = nodes.map(d=>d.name).filter(d=>d !== undefined);
             d3.select('.showBarDiff').style('display', 'block');
             d3.select('.barChartDropDown').classed('showMe', true);
-            d3.selectAll('select').attr("display", "none");
             makeDropDown(stations);
             d3.select('.lineMode').classed('showMe', true)
         }
 
 
         const barDiffFactory = () => {
-            //  d3.select('.showBarDiff').on('click', ()=> {
-            // d3.select('.barChartWrapper').classed('showMe', true);
-            const leftSelect = d3.select('.selectLeft').property('value')
-            const el = d3.selectAll('.station-circle');
-            const circles = el._groups[0];
-            const selection = Array.from(circles).filter(el=>d3.select(el).datum().name === leftSelect)[0];
-            d3.select(selection).attr('fill', otherColor)
-            //  const rightSelect = d3.select('.selectRight').property('value')
-            const barDiffdata = formatBarDiffData([currentStationSelection, leftSelect]);
-            d3.select('.barChartWrapper').classed('showMe', true);
-            d3.selectAll('.barGroup').remove();
-            barDiffdata.forEach(bar=>makeBarDiffChart(bar))
-
-            //   })
-
-
-        }
-        const makeBarDiffChart = (bardata)=> {
-            const {label, color, data} = bardata;
-            const width = barChartWidth;
-            const x0 = d3.scaleBand()
-                .rangeRound([0, width - BAR_OFFSET])
-                .paddingInner(0.1);
-
-            const x1 = d3.scaleBand()
-                .padding(0.05);
-            const z = d3.scaleOrdinal()
-                .range([selectColor, otherColor]);
-            const alphas = data.map(d=>d.category).reverse();
-            const y = d3.scaleLinear()
-                .rangeRound([barChartHeight, 0]);
-            const keys = ['valueA', 'valueB'];
-            x0.domain(data.map(d=> d.category));
-            x1.domain(keys).rangeRound([0, x0.bandwidth()]);
-            y.domain([0, d3.max(data, d=> d3.max(keys, key=> d[key]))]).nice(); //Same as Math.floor
-
-            let barChart = null;
-            let legendData = null;
-            switch (label) {
-                case 'Age':
-                    barChart = ageSVG;
-                    legendData = ageInCSV.slice().reverse();
-                    break;
-                case 'Sex':
-                    barChart = sexSVG;
-                    legendData = ['Male', 'Female'].slice().reverse();
-                    break;
-                case 'Journey':
-                    barChart = journeyChartSVG;
-                    legendData = journeyInCSV.slice().reverse();
-                    break;
-                case 'Market':
-                    barChart = marketSVG;
-                    legendData = marketInCSV.slice().reverse();
-                    break;
-                default:
-                    return barChart;
+            const compareStation = d3.select('.selectLeft').property('value');
+            if (!currentStationSelection) {
+                alert('Select a station on the line first, then choose a station to compare it with.');
+                d3.select('.selectLeft').property('selectedIndex', 0);
+                return;
             }
-
-
-            const barGroup = barChart.append("g").classed('barGroup', true)
-            barGroup.append('g').selectAll("g")
-                .data(data)
-                .enter().append("g")
-                .attr("transform", d=> "translate(" + x0(d.category) + ",0)")
-        .selectAll("rect")
-                .data(d=>keys.map(key=> ({key: key, value: d[key]})))
-        .enter().append("rect")
-                .attr("x", d=>x1(d.key))
-        .attr("y", d=>y(d.value))
-        .attr("width", x1.bandwidth())
-                .attr("height", d=> barChartHeight - y(d.value))
-        .attr("fill", (d)=> z(d.key));
-
-            barGroup.append("g")
-                .attr("class", "axis")
-                .attr("transform", "translate(0," + (barChartHeight) + ")")
-                .call(d3.axisBottom(x0));
-
-            barGroup.append("g")
-                .attr("class", "axis")
-                .call(d3.axisLeft(y).ticks(null, "s"))
-                .append("text")
-                .attr("x", 2)
-                .attr("y", y(y.ticks().pop()) + 0.5)
-
-
-            const legend = barGroup.append("g")
-
-                .attr("font-family", "sans-serif")
-                .attr("font-size", 10)
-                .attr("text-anchor", "end")
-                .selectAll("g")
-                .data(legendData)
-                .enter().append("g")
-                .attr("transform", (d, i)=> "translate(0," + i * 20 + ")");
-
-            legend.append("rect")
-                .attr("x", width - BAR_OFFSET)
-                .attr("width", 19)
-                .attr("height", 19)
-                .attr("fill", 'lightgrey');
-
-            legend.append("text")
-                .attr("x", width - BAR_OFFSET - 14)
-                .attr("y", 9.5)
-                .attr("dy", "0.32em")
-                .text(d=> d);
-
-            legend.append("text")
-                .attr("x", width - BAR_OFFSET + 12)
-                .attr("y", 9.5)
-                .attr("dy", "0.32em")
-                .text((d, i)=> alphas[i]);
-
-
-            // d3.select('body').classed('modal', true);
-            // d3.select('.zoomRect').classed('modal', true);
-            // d3.select('.closebarDiifChart').on('click', ()=> {
-            //     d3.select('body').classed('modal', false);
-            //     d3.select('.zoomRect').classed('modal', false);
-            //     d3.select('.barDiffChartWrapper').classed('showMe', false);
-            // })
-
-
+            if (!compareStation) return;
+            d3.selectAll('.station-circle').classed('compareSelected', d => d.name === compareStation);
+            renderSurvey([currentStationSelection, compareStation], true);
         }
 
 
@@ -624,7 +546,7 @@
                 .attr('stroke', color)
 
             d3.select(`.${day}`).style('background', color)
-            d3.select('.station').text(station ? station : 'Summary Data');
+            d3.select('.linechart .station').text(station ? stationTitle(station) : 'Summary Data');
             d3.select('body').classed('modal', true);
             d3.select('.zoomRect').classed('modal', true);
             d3.select('.close').on('click', ()=> {
@@ -654,35 +576,35 @@
             // const aggData = aggregateData(dataStore);
             d3.select('.lineMode').on('click', ()=> {
                 d3.selectAll('.lineGroup').remove();
-            lineFactory(currentStationSelection);
-            //aggData.forEach(line=>makeLine(line))
-        })
+                if (!currentStationSelection) {
+                    alert('Select a station on the line first to see its yearly entry/exit counts.');
+                    return;
+                }
+                lineFactory(currentStationSelection);
+            })
         }
 
 
         const makeDropDown = categories => {
+            d3.selectAll('.selectLeft').remove();
             const dropleft = d3.select('.dropleft')
                 .append('select')
-                .attr('class', 'selectLeft')
+                .attr('class', 'selectLeft select')
+                .attr('id', 'compare-select')
                 .on('change', ()=> barDiffFactory())
 
-            dropleft.selectAll('option')
-                .data(categories).enter()
-                .append('option')
-                .text(d=>d);
+            dropleft.append('option')
+                .attr('value', '')
+                .property('disabled', true)
+                .property('selected', true)
+                .text('Choose a station');
 
-
-
-
-            //
-            // const dropRight = d3.select('.dropRight')
-            //     .append('select')
-            //     .attr('class', 'selectRight')
-            //
-            // dropRight.selectAll('option')
-            //     .data(categories).enter()
-            //     .append('option')
-            //     .text(d=> d);
+            dropleft.selectAll('option.stationOption')
+                .data(categories)
+                .join('option')
+                .classed('stationOption', true)
+                .attr('value', d=>d)
+                .text(d=>stationTitle(d));
         }
 
 
@@ -776,11 +698,17 @@
                     .attr('fill', 'white')
                     .classed('zoomRect', true);
 
-                var zoomed = function zoomed() {
-                    gEnter.attr("transform", d3.event.transform.toString());
+                var zoomed = function zoomed(event) {
+                    gEnter.attr("transform", event.transform.toString());
                 };
 
-                zoom$$1 = d3.zoom().scaleExtent([0.5, 6]).on("zoom", zoomed);
+                // While a line is straightened, the mouse wheel scrolls the page
+                // (to reach the station charts) instead of zooming the map
+                zoom$$1 = d3.zoom().scaleExtent([0.5, 6])
+                    .filter(function (event) {
+                        return !lineModeActive && (!event.ctrlKey || event.type === 'wheel') && !event.button;
+                    })
+                    .on("zoom", zoomed);
 
                 gEnter = g.call(zoom$$1).append("g");
 
@@ -840,14 +768,10 @@
                     .attr("class", function (d) {
                         return d.name;
                     })
-                    .classed("line", true).on("click", function (line) {
+                    .classed("line", true).on("click", function (event, line) {
                     dropDownFactory(line);
 
                     //Here we transform the path
-                    // keep this path so we can use it later
-                    var pathElement = d3.select(this).node();
-                    var pathSegList = pathElement.pathSegList;
-                    //d3.selectAll(".station-circle").remove();
                     //var stations = d3.select("#map").selectAll(".station");
                     //console.log(stations);
                     //stations.filter("." + name);
@@ -886,17 +810,14 @@
                         map.highlightLine(name);
                         //Store the old path to transition back to
                         pathStorage.push({"id": name, "path": path});
-                        //Construct the object that ties names to stations and coordinates
-                        for (var j = 0; j < stationOrder.length; j++) {
-                            if (j !== 0) {
-                                newPath += "L" + (90 + j * 90) + "," + 200;
-                                stationPoints.push({name: stationOrder[j], coords: [(90 + j * 90), 200]});
-                            }
-                            else {
-                                newPath += (90) + "," + 200;
-                                stationPoints.push({name: stationOrder[j], coords: [(90), 200]});
-                            }
-                        }
+                        //Construct the object that ties names to stations and coordinates,
+                        //snaking the stations across the page in rows
+                        var snake = snakeLayout(stationOrder.length);
+                        newPath = snake.path;
+                        stationOrder.forEach(function (station, j) {
+                            stationPoints.push({name: station, coords: snake.points[j]});
+                        });
+                        d3.select('#container').attr('height', snake.height);
                     }
                     else {
                         map.unhighlightAll();
@@ -917,15 +838,9 @@
                             return d.coords[1]
                         })
                         .attr("r", 6).style("visibility", "visible")
-                        .on("click", function (d) {
-
-                            svgCir.selectAll('.stationSelect').classed('notSelected', true);
-                            svgCir.selectAll('.stationSelected').classed('stationSelected', false);
-
-                            d3.select(this).classed('stationSelected', true);
-                            barChartFactory(d.name)
-
-                          })
+                        .on("click", function (event, d) {
+                            selectLineStation(d.name);
+                        })
 
 
                         .attr("stroke", fgColor)
@@ -940,40 +855,97 @@ station_text.exit().remove();
 station_text = station_text.enter().append("g").attr("display", "inline").merge(station_text);
 
 
+                    // One label per station group (binding the whole list here
+                    // drew every name once per station, stacked on top of itself)
                     var text = station_text.selectAll('text')
-                        .data(stationPoints);
+                        .data(function (d) { return [d]; });
                     text.exit().remove();
                     text = text.enter()
                         .append('text').merge(text);
                     //Set station names
                     text.attr('x', function (d) {
-                        return d.coords[0] + 30;
+                        return d.coords[0];
                     })
-                        .attr('y', function (d, i) {
-                            if (i % 2 === 0) {
+                        .attr('y', function (d) {
+                            // Alternate names above/below the line
+                            if (stationPoints.indexOf(d) % 2 === 0) {
                                 return d.coords[1] + 20;
                             }
                             else return d.coords[1] - 20;
                         })
                         .attr("position", "absolute")
                         .text(function (d) {
-                            return d.name;
+                            return stationTitle(d.name);
                         })
                         .attr("dy", ".3em")
                         .style("visibility", "visible")// change dx and dy in order to center in the circle.
-                        .style("text-anchor", "end");
-                    d3.select(this).transition().duration(4000).attr("d", newPath);
-                }).on("mouseover", function (d) {
+                        .style("text-anchor", "middle")
+                        .classed("line-station-label", true)
+                        .on("click", function (event, d) {
+                            selectLineStation(d.name);
+                        });
+                    d3.select(this).interrupt().transition().duration(800).ease(d3.easeCubicInOut).attr("d", newPath);
+                }).on("mouseover", function () {
                   var name = d3.select(this).attr("id");
                   //map.highlightLine(name);
                   d3.select(this).style('stroke-width', 10);
 
 
-                }).on("mouseout", function(d){
+                }).on("mouseout", function () {
                   d3.select(this).style('stroke-width', lineWidth);
                     //map.unhighlightAll();
                 });
 
+
+                // Clicking a station name on the full map opens its line, as if
+                // the line had been clicked. A station on several lines or
+                // branches opens the longest one.
+                var openLineForStation = function (name) {
+                    if (pathStorage.length) return;
+                    var best = null;
+                    d3.select("#tube-map").selectAll("path.line").each(function (d) {
+                        var onLine = d.nodes.some(function (n) { return n.name === name; });
+                        if (onLine && (!best || d.stations.length > best.datum.stations.length)) {
+                            best = {el: this, datum: d};
+                        }
+                    });
+                    if (best) d3.select(best.el).dispatch("click");
+                };
+
+                // Re-flow the snaked line when the window is resized
+                var snakeResizeTimer = null;
+                window.addEventListener('resize', function () {
+                    clearTimeout(snakeResizeTimer);
+                    snakeResizeTimer = setTimeout(function () {
+                        if (!pathStorage.length) return;
+                        var lineGroup = d3.select('#line');
+                        var points = lineGroup.selectAll('.station-circle').data();
+                        if (!points.length) return;
+                        var snake = snakeLayout(points.length);
+                        points.forEach(function (d, j) { d.coords = snake.points[j]; });
+                        lineGroup.selectAll('.station-circle')
+                            .attr('cx', function (d) { return d.coords[0]; })
+                            .attr('cy', function (d) { return d.coords[1]; });
+                        lineGroup.selectAll('.line-station-label')
+                            .attr('x', function (d) { return d.coords[0]; })
+                            .attr('y', function (d) {
+                                return d.coords[1] + (points.indexOf(d) % 2 === 0 ? 20 : -20);
+                            });
+                        d3.select('#tube-map').select('path.line[id="' + CSS.escape(pathStorage[0].id) + '"]')
+                            .interrupt()
+                            .attr('d', snake.path);
+                        d3.select('#container').attr('height', snake.height);
+                    }, 150);
+                });
+
+                // Restore the full map: "click" whichever line is currently straightened
+                map.returnToFullMap = function () {
+                    d3.select("#tube-map").selectAll(".line")
+                        .filter(function (d) {
+                            return pathStorage.some(function (p) { return p.id === d.title; });
+                        })
+                        .dispatch("click");
+                };
 
                 var fgColor = "#000000";
                 var bgColor = "#ffffff";
@@ -1066,12 +1038,9 @@ station_text = station_text.enter().append("g").attr("display", "inline").merge(
       labels.enter().append("g").attr("id", function (d) {
         return d.name;
       }).classed("label", true).on("click", function () {
-        var label = d3.select(this);
-        var name = label.attr("id");
-
-        selectStation(name);
-
+        var name = d3.select(this).attr("id");
         dispatch$$1.call("click", this, name);
+        openLineForStation(name);
       }).append("text").text(function (d) {
         return d.text;
       }).attr("dy", 0.1).attr("x", function (d) {
@@ -1083,7 +1052,7 @@ station_text = station_text.enter().append("g").attr("display", "inline").merge(
         return textPos(d).textAnchor;
       }).style("display", function (d) {
         return d.hide !== true ? "block" : "none";
-      }).style("font-size", 1.2 * lineWidth / lineWidthMultiplier + "px").style("-webkit-user-select", "none").attr("class", function (d) {
+      }).style("font-size", 1.2 * lineWidth / lineWidthMultiplier + "px").style("user-select", "none").attr("class", function (d) {
         return d.marker.map(function (marker) {
           return marker.line;
         }).join(" ");
@@ -1145,12 +1114,14 @@ station_text = station_text.enter().append("g").attr("display", "inline").merge(
 
             interchanges.style("visibility", "hidden");
 
-            d3.select('#tube-map').select('svg').attr('height', '200')
-            //d3.select('.legendWrapper').style('display', 'none');
-
-           // d3.select('body').style('overflow', 'auto')
+            // Shrink the map to a strip for the straightened line and let the
+            // page scroll so the station charts below it are reachable
+            lineModeActive = true;
+            d3.select('body').classed('line-mode', true);
+            d3.select('#container').attr('height', 200);
             d3.select('.stationWrapper')
-                .attr("transform", "translate(5,-100  )");
+                .call(zoom$$1.transform, d3.zoomIdentity)
+                .attr("transform", "translate(5,-100)");
 
 
             lines.style("visibility", function (e) {
@@ -1168,335 +1139,129 @@ station_text = station_text.enter().append("g").attr("display", "inline").merge(
             river.style("visibility", "hidden");
         };
 
-         map.setTimeStop = function(){
-           this.timeStop = false;
-         }
-
-        map.endTimer = function(){
-          this.timeStop = !this.timeStop;
-
-        }
-
-	map.startTimer =  async function(csvData, timeTable, stationData, type){
-
-		//append circles to the stations with initial counts
-
-
-		    var lines = d3.select("#tube-map").selectAll(".line");
-		    var labels = d3.select("#tube-map").selectAll(".labels");
-				var interchanges = d3.select("#tube-map").selectAll(".interchanges");
-        var river = d3.select("#tube-map").selectAll(".river");
-
-
-        river.style("visibility", "hidden");
-
-				lines.style("opacity", 0.5);
-				// stations.classed("translucent", true);
-				//labels.classed("translucent", true);
-
-
-		var stations = d3.select("#tube-map").selectAll(".station");
-
-		var self_item = map;
-
-    var journeyCount = "";
-
-    if(type === "both"){
-		var obj = ["entry", "exit"];
-    journeyCount = "entry";
-  }
-  else if(type === "entry"){
-    var obj = ["entry"];
-    journeyCount = "entry";
-  }
-  else if(type === "exit"){
-    var obj = ["exit"];
-    journeyCount = "exit";
-
-  }
-
-
-
-
-      d3.select("#circlekey").style("display", "inline");
-
-
-
-		var svg = d3.select("#tube-map").selectAll(".station").selectAll("g").selectAll("circle").data(obj);
-
-		svg.exit().remove();
-
-		svg = svg.enter().append("circle").attr("class", function(d,i){
-			if(d === "entry"){
-				return "entry";
-			}
-			else{
-				return "exit";
-			}
-
-		}).merge(svg);
-
-		svg.attr("class", "time_circle").attr("r", 6).attr("cx", function(d){
-
-
-			if(d === "entry"){
-					return xScale(d3.select(this.parentNode)._groups[0][0].__data__.x + 1);
-			}
-			else{
-					return xScale(d3.select(this.parentNode)._groups[0][0].__data__.x - 1);
-			}
-
-		}).attr("cy", function(d){
-
-			if(d === "entry"){
-				return yScale(d3.select(this.parentNode)._groups[0][0].__data__.y);
-			}
-			else{
-				return yScale(d3.select(this.parentNode)._groups[0][0].__data__.y);
-			}
-
-		}).attr("class", function(d){
-			if(d === "entry"){
-				var mystring = d3.select(this.parentNode)._groups[0][0].__data__.name + "e";
-
-				mystring = mystring.split('&').join('');
-				mystring = mystring.replace(' ','');
-				mystring = mystring.split('\'').join('');
-
-				return mystring;
-			}else{
-				var mystring = d3.select(this.parentNode)._groups[0][0].__data__.name + "x";
-				mystring = mystring.split('&').join('');
-				mystring = mystring.replace(' ','');
-				mystring = mystring.split('\'').join('');
-
-				return mystring;
-			}
-
-		}).style("fill", function(d){
-			if(d === "entry"){
-				return "red";
-			}
-			else{
-				return "#00A4A7";
-			}
-		});
-
-    d3.select("#clock").text("Departing in 10 sec");
-
-
-    function wait(ms) {
-
-
-
-return new Promise(r => setTimeout(r, ms));
-  }
-
-
-
-
-
-
- var wait = await  wait(10000);
-
-
-
-
-			var time_data = setTimeData(csvData, timeTable, stationData);
-
-
-		var format_entry = d3.timeFormat("%S:%L");
-
-		var tick = 0;
-
-		//create a data structure that ties each station to the time passed through, and whether it was an entry or exit
-		//Take that data and tie the count to the circles that will be at each staation
-		map.timer = setInterval(function(elapsed) {
-			var time = timeTable[tick];
-
-
-      if(time === "04:45"){
-        map.timeStop = true;
-      }
-
-      d3.select("#clock").style("color", "#F7F122").text(time);
-
-			if(tick % 15 === 0){
-        var journeys = 0;
-
-
-
-		time_data.forEach(function(d){
-			//Select Al Entries
-
-
-			var mystring = d.txt_name;
-
-			mystring = mystring.split('&').join('');
-				mystring = mystring.split(' ').join('');
-			mystring = mystring.split('\'').join('');
-			mystring = mystring.split('.').join('');
-			mystring = mystring.split('\n').join('');
-			var entries  = d3.select("#tube-map").selectAll("." + mystring + "e");
-			var exits = d3.select("#tube-map").selectAll("." + mystring + "x");
-
-
-
-      // var exitScale = d3.scale.linear()
-      // .domain([0,d3.max(d.ext[0])])
-      // .range([3,20])
-
-
-			entries.transition().ease(d3.easeSin).duration(1000).attr("r", function(c){
-
-				if(d != null){
-					if(d.ent[0] != null){
-						if(d.ent[0][""+ time + ""] != null){
-
-
-
-              var entryScale = d3.scaleLinear()
-              .domain([0,+d.ent[0].Total])
-              .range([2,300]);
-
-              var num = 0;
-
-              if(d.int[0] != null){
-                if(d.int[0][""+ time + ""]){
-                  num = +d.ent[0]["" + time + ""] + +d.int[0][""+ time + ""];
-                }
-                else{
-                 num = +d.ent[0]["" + time + ""];
-                }
-              }
-              else{
-                num = +d.ent[0]["" + time + ""];
-              }
-
-
-              journeys+=+d.ent[0][""+ time + ""];
-							return entryScale(num);
-
-						}
-
-				}
-					else{
-						return 0;
-					};
-				}});
-
-        d3.select("#journey").text("" + journeys + " Journeys");
-
-				exits.transition().ease(d3.easeSin).duration(1000).attr("r", function(c){
-
-					if(d != null){
-						if(d.ext[0] != null){
-							if(d.ext[0][""+ time + ""] != null){
-                if(journeyCount === "exit"){
-                    journeys+=+d.ext[0][""+ time + ""];
+        map.setTimeStop = function () {
+            map.timeStop = false;
+        };
+
+        map.endTimer = function () {
+            map.timeStop = true;
+        };
+
+        /**
+         * "A Day on the Tube" animation.
+         * @param csvData   rows of RODS_2016/Misc/Stationflows/AEI-Summary.csv
+         * @param timeTable list of "HH:MM" strings, one per animation tick (minute)
+         * @param stationData stations.json contents
+         * @param type      "both" | "entry" | "exit"
+         * @param onFinish  called once the animation has stopped
+         */
+        map.startTimer = async function (csvData, timeTable, stationData, type, onFinish) {
+            var lines = d3.select("#tube-map").selectAll(".line");
+            var river = d3.select("#tube-map").selectAll(".river");
+            var formatCount = d3.format(",");
+
+            map.timeStop = false;
+            river.style("visibility", "hidden");
+            lines.style("opacity", 0.5);
+            d3.select("#circlekey").style("display", "inline");
+
+            var kinds = type === "both" ? ["entry", "exit"] : [type];
+            var journeyKind = type === "exit" ? "exit" : "entry";
+            var timeData = setTimeData(csvData, stationData);
+
+            // One entry and/or exit circle per station, drawn on top of the map
+            var circleData = [];
+            model.stations.toArray().forEach(function (station) {
+                if (station.x === undefined || !timeData.has(station.name)) return;
+                kinds.forEach(function (kind) {
+                    circleData.push({key: station.name, kind: kind, x: station.x, y: station.y});
+                });
+            });
+
+            d3.select("#tube-map").selectAll(".timeCircles").remove();
+            var circles = gEnter.append("g").attr("class", "timeCircles")
+                .selectAll("circle")
+                .data(circleData)
+                .join("circle")
+                .attr("class", function (d) { return "time_circle " + d.kind; })
+                .attr("r", 6)
+                .attr("cx", function (d) { return xScale(d.kind === "entry" ? d.x + 1 : d.x - 1); })
+                .attr("cy", function (d) { return yScale(d.y); })
+                .style("fill", function (d) { return d.kind === "entry" ? "red" : "#00A4A7"; })
+                .style("pointer-events", "none");
+
+            var finish = function () {
+                clearInterval(map.timer);
+                map.timer = null;
+                river.style("visibility", "visible");
+                d3.select("#tube-map").selectAll(".timeCircles").remove();
+                lines.style("opacity", 1);
+                d3.select("#circlekey").style("display", "none");
+                d3.select("#journey").text("");
+                d3.select("#clock").text("");
+                if (onFinish) onFinish();
+            };
+
+            // Ten second countdown before the clock starts
+            for (var remaining = 10; remaining > 0; remaining--) {
+                if (map.timeStop) return finish();
+                d3.select("#clock").text("Departing in " + remaining + " sec");
+                await new Promise(function (r) { setTimeout(r, 1000); });
+            }
+            if (map.timeStop) return finish();
+
+            // Radius is the share of the station's daily total in this 15 min slot
+            // (interchanges count towards both entries and exits)
+            var radiusFor = function (main, interchange, time) {
+                if (!main || main[time] === undefined || main[time] === "") return 0;
+                var num = +main[time] + (interchange && interchange[time] ? +interchange[time] : 0);
+                return d3.scaleLinear().domain([0, +main.Total]).range([2, 300])(num) || 0;
+            };
+
+            var tick = 0;
+            map.timer = setInterval(function () {
+                var time = timeTable[tick];
+
+                if (map.timeStop || time === undefined || time === "04:45") {
+                    return finish();
                 }
 
-                var num = 0;
+                d3.select("#clock").style("color", "#F7F122").text(time);
 
-                if(d.int[0] != null){
-                  if(d.int[0][""+ time + ""]){
-                    num = +d.ext[0]["" + time + ""] + +d.int[0][""+ time + ""];
-                  }
-                  else{
-                   num = +d.ext[0]["" + time + ""];
-                  }
+                // The survey data is in 15 minute buckets
+                if (tick % 15 === 0) {
+                    var journeys = 0;
+                    timeData.forEach(function (d) {
+                        var rows = d[journeyKind];
+                        if (rows[0] && rows[0][time]) journeys += +rows[0][time];
+                    });
+                    d3.select("#journey").text(formatCount(journeys) + " Journeys");
+
+                    circles.transition().ease(d3.easeSin).duration(1000).attr("r", function (c) {
+                        var d = timeData.get(c.key);
+                        var main = c.kind === "entry" ? d.entry[0] : d.exit[0];
+                        return radiusFor(main, d.interchange[0], time);
+                    });
                 }
-                else{
-                  num = +d.ext[0]["" + time + ""];
-                }
 
+                tick++;
+            }, 50);
+        };
 
-
-
-                var exitScale = d3.scaleLinear()
-                .domain([0,+d.ext[0].Total])
-                .range([2,300]);
-
-								return exitScale(num);
-							}
-							else{
-								return 0;
-							}
-
-						}
-						else{
-							return 0;
-						};
-					}});
-
-
-
-
-    //
-
-		});
-}
-
-
-
-
-	tick++;
-
-  if (elapsed > 72000 || map.timeStop){
-
-    clearInterval(map.timer)
-    river.style("visibility", "visible");
-    d3.select("#tube-map").selectAll("circle").remove();
-    lines.style("opacity", 1);
-    d3.timerFlush();
-    var button = document.getElementById("tube-button");
-      d3.select("#journey").text("");
-      d3.select("#clock").text("");
-
-    button.addEventListener("click", function() {
-  startTimeAnimation();
-}, false);
-
-d3.select("#stopButton").remove();
-
-
-    return;
-  }
-}, 50,6000);
-
-
-	};
-
-
-  map.stopTubeTimer = function(){
-
-    document.getElementById("stopButton").click();
-     var lines = d3.select("#tube-map").selectAll(".line");
-      var river = d3.select("#tube-map").selectAll(".river");
-      clearInterval(this.timer);
-
-    river.style("visibility", "visible");
-    d3.select("#tube-map").selectAll("circle").remove();
-    lines.style("opacity", 1);
-    d3.timerFlush();
-    var button = document.getElementById("tube-button");
-      d3.select("#journey").text("");
-      d3.select("#clock").text("");
-
-    button.addEventListener("click", function() {
-  startTimeAnimation();
-}, false);
-
-d3.select("#stopButton").remove();
-  }
+        map.stopTubeTimer = function () {
+            map.endTimer();
+        };
 
         map.unhighlightAll = function () {
 
-            d3.select('#tube-map').select('svg').attr('height', '1024')
-            d3.select('body').style('overflow', 'hidden')
+            lineModeActive = false;
+            d3.select('body').classed('line-mode', false);
+            window.scrollTo(0, 0);
+            d3.select('#container').attr('height', 1024);
+            d3.select('.stationWrapper').attr('transform', null);
             d3.select('.legendWrapper').style('display', 'inline')
             d3.select('.lineMode').classed('showMe', false);
-            d3.select('.barChartWrapper').classed('showMe', false);
+            hideSurvey();
             d3.select('.barChartDropDown').classed('showMe', false);
             d3.select("#circlekey").style("display", "none");
 
@@ -1567,103 +1332,30 @@ d3.select("#stopButton").remove();
             selectStation(name);
         };
 
+        // Station keys can contain characters such as "&", so escape them for CSS selectors
         function selectStation(name) {
             d3.select(".labels").selectAll(".label").classed("selected", false);
-            d3.select(".labels").select("#" + name).classed("selected", true);
+            d3.select(".labels").select("#" + CSS.escape(name)).classed("selected", true);
         }
 
         function visitStation(name, highlighted) {
-            d3.select(".labels").select("#" + name).select("text").classed("highlighted", highlighted);
+            d3.select(".labels").select("#" + CSS.escape(name)).select("text").classed("highlighted", highlighted);
         }
 
-	function setTimeData(csvData, timeTable, stationData){
-
-
-		var stations = d3.select("#tube-map").selectAll(".station");
-
-
-
-
-
-				var format_exit = d3.timeFormat("%S:%L");
-
-
-
-
-		var time_stamp = 0;
-
-		var time_table_initial = [];
-
-		var station_time_structure = [];
-
-
-		var stations_array = []; // This will be the resulting array
-for(var key in stationData.stations) {
-  var entry = stationData.stations[key]; // This will be each of the three graded things
-  entry.id = key; // e.g. "id": "assessment1"
-  stations_array.push(entry)
-}
-
-
-//for each unique station, add the data of station numbers
-stations_array.forEach(function(da){
-
-
-
-
-
-
-				var entry = csvData.filter(function(d,i){
-					//Access
-						return d.StartStn.trim() === da.title && d.AEI === "A";
-					// var string = da.toString();
-					// return d.EntTimeHHMM === string;
-				});
-
-
-				var exit = csvData.filter(function(d,i){
-					//Egress or exit
-					return d.StartStn.trim() === da.title && d.AEI === "E";
-					// var string = da.toString();
-					// return d.EXTimeHHMM === string;
-				});
-
-				var inter = csvData.filter(function(d,i){
-
-					return d.StartStn.trim() === da.title && d.AEI === "I";
-				})
-
-
-
-          //
-					// var ent_filt = entry.filter(function(d){
-					// 	return d.StartStn === data.__data__.name;
-					// })
-          //
-					// var ext_filt = exit.filter(function(d){
-					// 	return d.EndStation === data.__data__.name;
-					// })
-
-					var mystring = da.title;
-					mystring = mystring.split(' ').join('')
-					mystring = mystring.split('\n').join('')
-
-
-
-
-					station_time_structure.push({gname: da.title, txt_name: mystring,  ent: entry, ext: exit, int: inter})
-
-
-
-
-			});
-
-
-
-
-
-		return station_time_structure;
-	}
+        // Group the AEI (Access/Egress/Interchange) survey rows by station key
+        function setTimeData(csvData, stationData) {
+            var resolve = TubeData.stationIndex(stationData.stations);
+            var byStation = new Map();
+            csvData.forEach(function (row) {
+                var kind = {A: "entry", E: "exit", I: "interchange"}[(row.AEI || "").trim()];
+                if (!kind) return;
+                resolve(row.StartStn).forEach(function (key) {
+                    if (!byStation.has(key)) byStation.set(key, {entry: [], exit: [], interchange: []});
+                    byStation.get(key)[kind].push(row);
+                });
+            });
+            return byStation;
+        }
 
   function drawLine(data) {
     var path = "";

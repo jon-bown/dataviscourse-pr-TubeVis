@@ -39,3 +39,21 @@ The 4 main components of the project will be:
 3: Animating the lines when clicked so that we get just the stations on a particular line (similar to how the Tube displays an individual line to the user)
 
 4: Allowing the user to select individual stations. Here we will select a station and show data that was compiled from a 2016 study that shows demographic, origin, destination, and other metrics for people who used the station. 
+
+
+## Running locally
+
+The pages load their data with `fetch`, which browsers block for `file://` URLs, so serve the folder over HTTP:
+
+```sh
+python3 -m http.server 8000
+# then open http://localhost:8000/index.html
+```
+
+Any static file server works (for example `npx serve`). No build step or API keys are needed.
+
+### Libraries
+
+- [D3 v7](https://d3js.org/) (loaded from jsDelivr) for the tube map, charts and data loading
+- [Leaflet 1.9](https://leafletjs.com/) + [Leaflet.heat](https://github.com/Leaflet/Leaflet.heat) with OpenStreetMap tiles for the station map (`map.html`), replacing the Google Maps API and its retired heatmap layer
+- `d3-tube-map/d3-tube-map.js` is a customised copy of [d3-tube-map](https://github.com/johnwalley/d3-tube-map) ported to D3 v7; `js/tubeData.js` holds the shared CSV loading and station-name matching

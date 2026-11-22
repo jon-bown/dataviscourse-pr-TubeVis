@@ -1,0 +1,382 @@
+/* Shared look for every page: Underground-style type, the page title,
+   the tabs linking the three views, and the roundel.
+
+   Hammersmith One is an open font modelled on Johnston, the London
+   Underground typeface. It has a single weight, so headings use size and
+   colour rather than bold (browsers would otherwise fake a bold). */
+
+:root {
+  --tube-blue: #0019A8;
+  --tube-blue-dark: #000F6B;
+  --tube-red: #DC241F;
+  --text-secondary: #52514e;
+  --site-font: 'Hammersmith One', 'Gill Sans', 'Gill Sans MT', sans-serif;
+}
+
+body {
+  background: #fff;
+}
+
+body,
+button,
+select,
+input {
+  font-family: var(--site-font);
+}
+
+h1, h2, h3, h4, h5, h6, b, strong {
+  font-weight: normal;
+}
+
+/* ---- Title ---- */
+.site-title {
+  margin: 18px 120px 10px;
+  text-align: center;
+  font-size: 32px;
+  letter-spacing: 0.01em;
+  color: var(--tube-blue);
+}
+
+.site-subtitle {
+  margin: 12px 0 14px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* ---- Tabs linking the three views ---- */
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.site-nav a {
+  padding: 8px 20px;
+  border: 2px solid var(--tube-blue);
+  border-radius: 999px;
+  background: var(--tube-blue);
+  color: #fff;
+  font-size: 17px;
+  text-decoration: none;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.site-nav a:hover,
+.site-nav a:focus-visible {
+  background: var(--tube-blue-dark);
+  border-color: var(--tube-blue-dark);
+  text-decoration: none;
+}
+
+.site-nav a:focus-visible {
+  outline: 3px solid var(--tube-red);
+  outline-offset: 2px;
+}
+
+/* The page you're on: outlined, not filled */
+.site-nav a[aria-current="page"] {
+  background: #fff;
+  color: var(--tube-blue);
+  cursor: default;
+}
+
+/* ---- Roundel, pinned top right ---- */
+.roundel {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+
+.roundel img {
+  width: 100px;
+  height: 80px;
+}
+
+/* Narrow windows: let the title use the full width under the roundel */
+@media (max-width: 700px) {
+  .site-title {
+    margin: 96px 16px 10px;
+    font-size: 26px;
+  }
+}
+
+/* =====================================================================
+   Controls: buttons, dropdowns, segmented toggles, switches and sliders.
+   Shared by the Tube Map and Station Map pages.
+   ===================================================================== */
+
+:root {
+  --control-border: #c9c7c0;
+  --control-surface: #ffffff;
+  --control-hover: #f4f5fb;
+  --control-height: 36px;
+}
+
+/* ---- Buttons ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--control-height);
+  padding: 0 16px;
+  border: 2px solid var(--tube-blue);
+  border-radius: 8px;
+  background: var(--control-surface);
+  color: var(--tube-blue);
+  font: 15px var(--site-font);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.btn:hover {
+  background: var(--control-hover);
+}
+
+.btn-primary {
+  background: var(--tube-blue);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--tube-blue-dark);
+  border-color: var(--tube-blue-dark);
+}
+
+.btn-danger {
+  border-color: var(--tube-red);
+  color: var(--tube-red);
+}
+
+.btn-danger:hover {
+  background: #fdf1f1;
+}
+
+.btn-large {
+  height: 44px;
+  padding: 0 22px;
+  font-size: 17px;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  flex: none;
+}
+
+/* ---- Dropdowns ---- */
+.select {
+  height: var(--control-height);
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background: var(--control-surface)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%230019A8' stroke-width='2'/%3E%3C/svg%3E")
+    no-repeat right 12px center;
+  color: #0b0b0b;
+  font: 15px var(--site-font);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.select:hover {
+  border-color: var(--tube-blue);
+}
+
+/* ---- Segmented toggle: a row of radio buttons styled as one control ---- */
+fieldset.control-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+fieldset.segmented,
+.segmented {
+  position: relative;
+  display: inline-flex;
+  align-self: flex-start;
+  margin: 0;
+  min-width: 0;
+  padding: 3px;
+  border: 1px solid var(--control-border);
+  border-radius: 10px;
+  background: #f1f1ee;
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmented label {
+  display: inline-flex;
+  align-items: center;
+  height: calc(var(--control-height) - 8px);
+  padding: 0 14px;
+  border-radius: 7px;
+  color: #3a3936;
+  font-size: 15px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.segmented label:hover {
+  color: var(--tube-blue);
+}
+
+.segmented input:checked + label {
+  background: var(--tube-blue);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.segmented:disabled label,
+fieldset:disabled .segmented label {
+  cursor: not-allowed;
+}
+
+/* ---- On/off switch (a styled checkbox) ---- */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--control-height);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.switch input {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  margin: 0;
+  border-radius: 999px;
+  background: #b9b7b0;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.switch input::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s;
+}
+
+.switch input:checked {
+  background: var(--tube-blue);
+}
+
+.switch input:checked::after {
+  transform: translateX(18px);
+}
+
+/* ---- Sliders ---- */
+.slider {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--control-height);
+}
+
+.slider input[type="range"] {
+  width: 140px;
+  accent-color: var(--tube-blue);
+  cursor: pointer;
+}
+
+.slider output {
+  min-width: 2.5em;
+  color: var(--tube-blue);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Labelled fields laid out in a wrapping toolbar ---- */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px 22px;
+  padding: 14px 18px;
+  border: 1px solid #e4e2dc;
+  border-radius: 12px;
+  background: #fbfbfa;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.field-label,
+.field > legend {
+  padding: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.toolbar-break {
+  flex-basis: 100%;
+  height: 0;
+}
+
+/* A group whose controls only apply in some modes */
+fieldset.control-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px 22px;
+  transition: opacity 0.15s;
+}
+
+fieldset.control-group:disabled {
+  opacity: 0.45;
+}
+
+fieldset.control-group:disabled * {
+  cursor: not-allowed;
+}
+
+.hint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* ---- Keyboard focus ---- */
+.btn:focus-visible,
+.select:focus-visible,
+.switch input:focus-visible,
+.slider input:focus-visible {
+  outline: 3px solid var(--tube-red);
+  outline-offset: 2px;
+}
+
+.segmented input:focus-visible + label {
+  outline: 3px solid var(--tube-red);
+  outline-offset: 1px;
+}
