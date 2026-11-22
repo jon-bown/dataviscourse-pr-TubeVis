@@ -117,18 +117,23 @@ text {
 text.highlighted {
   text-decoration: line-through;
 }
-.keyLineItem
-{
-	float: left;
+/* Entries/Exits key: dots matching the animation's station circles */
+.keyRow {
+	display: flex;
+	align-items: center;
+	gap: 8px;
 	margin: 4px 5px;
-	width: 18px;
-	height: 4px;
-	border-radius: 2px;
-	cursor: pointer;
+}
+.keyCircle
+{
+	flex: none;
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
 }
 .keyItemText
 {
-	float: left; font-size: 15px;
+	font-size: 15px;
 }
 
 .line {
