@@ -5,21 +5,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Yearly Entry and Exit Tube Data</title>
     <link rel="icon" href="data:,">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hammersmith+One&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="site.css">
     <style>
         html, body {
             margin: 0;
             padding: 0;
-            background: #fff;
         }
 
-        .roundel {
-            float: right;
+        .section-title {
+            margin: 24px 0 10px;
+            font-size: 24px;
+            color: var(--tube-blue);
         }
 
-        .roundel img {
-            width: 100px;
-            height: 80px;
+        .note {
+            margin-top: 4px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .map-info {
+            line-height: 1.6;
+        }
+
+        .map-info b {
+            color: var(--text-secondary);
+        }
+
+        /* Leaflet sets its own font on tooltips and attribution */
+        .leaflet-container {
+            font-family: var(--site-font);
+        }
+
+        hr.section-rule {
+            width: 92%;
+            margin: 28px auto 0;
+            border: 0;
+            border-top: 1px solid #e4e2dc;
         }
 
         .map-row {
@@ -59,15 +85,18 @@
     <img src="https://vignette.wikia.nocookie.net/logopedia/images/3/3a/London_Underground_1970_roundel_small.png/revision/latest?cb=20120209090410"
          alt="London Underground" width="100" height="80">
 </a>
-<nav>
-    <ul>
-        <li><a href="index.html">Tube Map</a></li>
-        <li><a href="video.html">Demo Video</a></li>
-    </ul>
-    <h1 style="margin-left:30px;">Yearly Entry and Exit Tube Data</h1>
-</nav>
+<header>
+    <h1 class="site-title">A Typical Day on the Tube: Who goes where? And When?</h1>
+    <nav class="site-nav" aria-label="Views">
+        <a href="index.html">Tube Map</a>
+        <a href="map.html" aria-current="page">Station Map</a>
+        <a href="video.html">Demo Video</a>
+    </nav>
+    <p class="site-subtitle">Pick a year, entries or exits and a day to map each station's traffic; the second map shows the 2016 survey</p>
+</header>
 
 <div id="floating-panel1" class="panel">
+    <h2 class="section-title">Yearly Entry and Exit Tube Data</h2>
     <label for="data-year">Select Year</label>
     <select id="data-year" onchange="callback(); changeDisplayBox1()">
         <option disabled selected value> -- select an option --</option>
@@ -106,7 +135,7 @@
     <button type="button" onclick="reduceRadius()">Reduce Radius</button>
     <button type="button" onclick="addOpacity()">Add Opacity</button>
     <button type="button" onclick="reduceOpacity()">Reduce Opacity</button>
-    <div>Note: Gradient, radius and opacity only work with the heatmap.</div>
+    <div class="note">Note: Gradient, radius and opacity only work with the heatmap.</div>
 </div>
 
 <div class="map-row">
@@ -122,10 +151,10 @@
     </div>
 </div>
 
-<hr style="width:98%; margin-right:2%">
+<hr class="section-rule">
 
 <div id="floating-panel2" class="panel">
-    <h2>2016 Tube Survey Data</h2>
+    <h2 class="section-title">2016 Tube Survey Data</h2>
     <label for="survey-stat">Select Entry Data</label>
     <select id="survey-stat" onchange="surveyCallback(); changeDisplayBox2()">
         <option disabled selected value> -- select an option --</option>
@@ -147,8 +176,8 @@
     <button type="button" onclick="reduceRadius2()">Reduce Radius</button>
     <button type="button" onclick="addOpacity2()">Add Opacity</button>
     <button type="button" onclick="reduceOpacity2()">Reduce Opacity</button>
-    <div>Note: Gradient, radius and opacity only work with the heatmap.</div>
-    <div>Note 2: Only compare bubbles in the same instance. They are not tuned to scale for different instances.</div>
+    <div class="note">Note: Gradient, radius and opacity only work with the heatmap.</div>
+    <div class="note">Note 2: Only compare bubbles in the same instance. They are not tuned to scale for different instances.</div>
 </div>
 
 <div class="map-row">

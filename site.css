@@ -1,0 +1,104 @@
+/* Shared look for every page: Underground-style type, the page title,
+   the tabs linking the three views, and the roundel.
+
+   Hammersmith One is an open font modelled on Johnston, the London
+   Underground typeface. It has a single weight, so headings use size and
+   colour rather than bold (browsers would otherwise fake a bold). */
+
+:root {
+  --tube-blue: #0019A8;
+  --tube-blue-dark: #000F6B;
+  --tube-red: #DC241F;
+  --text-secondary: #52514e;
+  --site-font: 'Hammersmith One', 'Gill Sans', 'Gill Sans MT', sans-serif;
+}
+
+body {
+  background: #fff;
+}
+
+body,
+button,
+select,
+input {
+  font-family: var(--site-font);
+}
+
+h1, h2, h3, h4, h5, h6, b, strong {
+  font-weight: normal;
+}
+
+/* ---- Title ---- */
+.site-title {
+  margin: 18px 120px 10px;
+  text-align: center;
+  font-size: 32px;
+  letter-spacing: 0.01em;
+  color: var(--tube-blue);
+}
+
+.site-subtitle {
+  margin: 12px 0 14px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* ---- Tabs linking the three views ---- */
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.site-nav a {
+  padding: 8px 20px;
+  border: 2px solid var(--tube-blue);
+  border-radius: 999px;
+  background: var(--tube-blue);
+  color: #fff;
+  font-size: 17px;
+  text-decoration: none;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.site-nav a:hover,
+.site-nav a:focus-visible {
+  background: var(--tube-blue-dark);
+  border-color: var(--tube-blue-dark);
+  text-decoration: none;
+}
+
+.site-nav a:focus-visible {
+  outline: 3px solid var(--tube-red);
+  outline-offset: 2px;
+}
+
+/* The page you're on: outlined, not filled */
+.site-nav a[aria-current="page"] {
+  background: #fff;
+  color: var(--tube-blue);
+  cursor: default;
+}
+
+/* ---- Roundel, pinned top right ---- */
+.roundel {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+
+.roundel img {
+  width: 100px;
+  height: 80px;
+}
+
+/* Narrow windows: let the title use the full width under the roundel */
+@media (max-width: 700px) {
+  .site-title {
+    margin: 96px 16px 10px;
+    font-size: 26px;
+  }
+}

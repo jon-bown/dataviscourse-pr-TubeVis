@@ -421,26 +421,9 @@ body {
   background: #fff;
 }
 
-.roundel {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 1;
-}
-
-.roundel img {
-  width: 100px;
-  height: 80px;
-}
-
 #floating-panel1 {
   margin-left: 30px;
   margin-bottom: 10px;
-}
-
-#floating-panel1 h1,
-#floating-panel1 h5 {
-  text-align: center;
 }
 
 #floating-panel1 button {
@@ -684,4 +667,30 @@ body.line-mode {
 
 .chart-tooltip .tt-count {
   color: #52514e;
+}
+
+/* ---- Tube map page type (shared font, title and tabs live in site.css) ---- */
+#floating-panel1 h4.lineMode {
+  font-size: 16px;
+  color: #0019A8;
+  cursor: pointer;
+}
+
+.legendTitle {
+  font-size: 18px;
+  font-weight: normal;
+}
+
+/* Chart numbers keep a system font with even-width digits */
+.surveyChart .value-label,
+.surveyChart .tick-labels text,
+.chart-tooltip .tt-value,
+.chart-tooltip .tt-count {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.barChartWrapper,
+.surveyChart .category-label,
+.chart-tooltip {
+  font-family: 'Hammersmith One', 'Gill Sans', 'Gill Sans MT', sans-serif;
 }
